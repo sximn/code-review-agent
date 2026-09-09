@@ -11,6 +11,7 @@ class AppConfig(BaseSettings):
     )
 
     openai_api_key: str = Field(min_length=1)
+    model: str = Field(min_length=1)
 
 
 environment = AppConfig()
