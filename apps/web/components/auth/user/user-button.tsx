@@ -114,7 +114,7 @@ export function UserButton({
   links,
   hideSettings = false
 }: UserButtonProps) {
-  const { authClient, basePaths, viewPaths, localization, plugins, navigate } =
+  const { authClient, basePaths, emailAndPassword, viewPaths, localization, plugins, navigate } =
     useAuth<MultiSessionAuthClient>()
 
   const { isPending: settingActiveSession } = useSetActiveSession(authClient)
@@ -246,6 +246,7 @@ export function UserButton({
               {localization.auth.signIn}
             </DropdownMenuItem>
 
+            {emailAndPassword.enabled && (
             <DropdownMenuItem
               onClick={() =>
                 navigate({
@@ -256,7 +257,7 @@ export function UserButton({
               <UserPlus2 className="text-muted-foreground" />
 
               {localization.auth.signUp}
-            </DropdownMenuItem>
+            </DropdownMenuItem>)}
 
             {plugins.flatMap((plugin) =>
               plugin.userMenuItems?.map((Item, index) => (
