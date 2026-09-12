@@ -41,8 +41,7 @@ import { isAuthFormFieldInvalid, useAuthForm } from "./auth-form"
 import { LastUsedBadge } from "./last-login-method/last-used-badge"
 import { ProviderButtons, type SocialLayout } from "./provider-buttons"
 import { ReauthenticationNotice } from "./reauthentication"
-import CloudCanvas from "../clouds"
-import { useMediaQuery } from "@/lib/hooks/media-query"
+import { useMediaQuery } from "@/hooks/use-media-query"
 
 export type SignInProps = {
   className?: string
@@ -385,4 +384,3 @@ export function SignIn({
     </div>
   )
 }
-

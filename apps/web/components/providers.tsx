@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useTheme } from "next-themes"
 import { useParams, useRouter } from "next/navigation"
 import type { ReactNode } from "react"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { authClient } from "@/lib/auth-client"
 import { getQueryClient } from "@/lib/query-client"
 import { AuthProvider } from "./auth/auth-provider"
@@ -28,35 +29,37 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider
-        authClient={authClient}
-        redirectTo="/dashboard"
-        socialProviders={["google", "github"]}
-        emailAndPassword={{ enabled: false, requireEmailVerification: false }}
-        navigate={({ to, replace }) =>
-          replace ? router.replace(to) : router.push(to)
-        }
-        plugins={[
-          usernamePlugin({
-            usernamePrefix: "@",
-            localization: { usernamePlaceholder: "username" }
-          }),
-          magicLinkPlugin(),
-          passkeyPlugin(),
-          themePlugin({ useTheme }),
-          multiSessionPlugin(),
-          deleteUserPlugin(),
-          organizationPlugin({
-            slugPrefix: "@",
-            slug
-          })
-        ]}
-        Link={Link}
-      >
-        {children}
+      <TooltipProvider>
+        <AuthProvider
+          authClient={authClient}
+          redirectTo="/dashboard"
+          socialProviders={["google", "github"]}
+          emailAndPassword={{ enabled: false, requireEmailVerification: false }}
+          navigate={({ to, replace }) =>
+            replace ? router.replace(to) : router.push(to)
+          }
+          plugins={[
+            usernamePlugin({
+              usernamePrefix: "@",
+              localization: { usernamePlaceholder: "username" }
+            }),
+            magicLinkPlugin(),
+            passkeyPlugin(),
+            themePlugin({ useTheme }),
+            multiSessionPlugin(),
+            deleteUserPlugin(),
+            organizationPlugin({
+              slugPrefix: "@",
+              slug
+            })
+          ]}
+          Link={Link}
+        >
+          {children}
 
-        <Toaster />
-      </AuthProvider>
+          <Toaster />
+        </AuthProvider>
+      </TooltipProvider>
     </QueryClientProvider>
   )
 }
