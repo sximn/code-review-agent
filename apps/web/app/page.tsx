@@ -3,14 +3,12 @@ import FluidGradient from "@/components/fluid-gradient/fluid-gradient";
 export default function Page() {
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="relative overflow-hidden flex flex-1 w-full flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
+      <main className="relative overflow-hidden flex flex-1 w-full flex-col items-center justify-end py-32 px-16 bg-white dark:bg-black sm:items-start">
         <FluidGradient
           intensity={1.55}
           lineCount={54}
           className="opacity-[0.92] brightness-100 dark:brightness-95"
         />
-        
-        <section className="relative w-full z-10"></section>
 
         <div className="relative z-10 mx-auto flex w-full max-w-360 flex-col px-5 sm:px-8 lg:px-12">
           <section id="top" className="flex flex-1 flex-col justify-center">
