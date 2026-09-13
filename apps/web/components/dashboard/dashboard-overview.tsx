@@ -76,7 +76,7 @@ export function DashboardOverview({
   const greetWithName = isEmpty ? (n: string) => `Whenever you are ready, ${n}.` : greet();
 
   return (
-    <main className="flex flex-col flex-1 bg-[radial-gradient(circle_at_28%_18%,rgba(234,247,255,0.7),transparent_28rem),radial-gradient(circle_at_88%_85%,rgba(232,227,255,0.45),transparent_22rem)] dark:bg-[radial-gradient(circle_at_28%_18%,rgba(11,18,32,0.6),transparent_28rem),radial-gradient(circle_at_88%_85%,rgba(28,7,32,0.45),transparent_22rem)]">
+    <main className="flex flex-col flex-1 bg-[radial-gradient(circle_at_28%_18%,rgba(234,247,255,0.7),transparent_28rem),radial-gradient(circle_at_88%_85%,rgba(232,227,255,0.45),transparent_22rem)] dark:bg-[radial-gradient(circle_at_28%_18%,rgba(11,18,32,0.6),transparent_28rem),radial-gradient(circle_at_88%_85%,rgba(18,17,42,0.45),transparent_22rem)]">
       <div className="mx-auto w-full max-w-6xl px-5 py-2 sm:px-8 sm:py-4">
         <section
           className="flex flex-col gap-8 pb-5 sm:pb-6 lg:flex-row lg:items-end lg:justify-between"
