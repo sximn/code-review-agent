@@ -278,22 +278,20 @@ export function CloudCanvas({ showControls = false }: { showControls?: boolean }
 
   return (
     <div className="flex size-full justify-center items-center">
-        {/* <div className="relative h-5/6 w-11/12 md:w-4/5"> */}
-          <canvas ref={canvasRef} className="size-full rounded-2xl border-2 border-white/60" />
-          {showControls && (
-            <div className="absolute right-4 top-4 z-10 max-h-[calc(100%-2rem)] w-64 space-y-3 overflow-auto rounded-xl bg-black/60 p-4 font-mono text-xs text-white backdrop-blur-md">
-              <div className="font-sans text-sm font-semibold">Cloud controls</div>
-              {slider('scale', 'Scale', 0.5, 6, 0.01)}{slider('speed', 'Speed', 0, 10, 0.01)}
-              {slider('evolve', 'Evolution', 0, 2, 0.01)}{slider('shear', 'Shear', -2, 2, 0.01)}
-              {slider('coverage', 'Coverage', 0, 1, 0.01)}{slider('softness', 'Softness', 0.01, 0.6, 0.01)}
-              {slider('warpStr', 'Warp strength', 0, 2, 0.01)}{slider('vigStr', 'Vignette strength', 0, 2, 0.01)}
-              {slider('grainAmt', 'Grain amount', 0, 0.3, 0.001)}
-              <div className="space-y-2 border-t border-white/20 pt-3">{toggle('domainWarp', 'Domain warp')}{toggle('depth', 'Depth')}{toggle('vertFlow', 'Vertical flow')}{toggle('vignette', 'Vignette')}{toggle('grain', 'Grain')}{toggle('sunrise', 'Sunrise')}</div>
-              <div className="space-y-2 border-t border-white/20 pt-3">{color('cSky', 'Sky')}{color('cCloud', 'Cloud')}{color('cShadow', 'Shadow')}{color('cGlow', 'Glow')}</div>
-              <button className="rounded bg-white/15 px-2 py-1 hover:bg-white/25" onClick={() => { settingsRef.current = { ...defaults }; refreshControls((count) => count + 1) }}>Reset</button>
-            </div>
-          )}
-        {/* </div> */}
+        <canvas ref={canvasRef} className="size-full rounded-2xl border-2 border-white/60" />
+        {showControls && (
+        <div className="absolute right-4 top-4 z-10 max-h-[calc(100%-2rem)] w-64 space-y-3 overflow-auto rounded-xl bg-black/60 p-4 font-mono text-xs text-white backdrop-blur-md">
+            <div className="font-sans text-sm font-semibold">Cloud controls</div>
+            {slider('scale', 'Scale', 0.5, 6, 0.01)}{slider('speed', 'Speed', 0, 10, 0.01)}
+            {slider('evolve', 'Evolution', 0, 2, 0.01)}{slider('shear', 'Shear', -2, 2, 0.01)}
+            {slider('coverage', 'Coverage', 0, 1, 0.01)}{slider('softness', 'Softness', 0.01, 0.6, 0.01)}
+            {slider('warpStr', 'Warp strength', 0, 2, 0.01)}{slider('vigStr', 'Vignette strength', 0, 2, 0.01)}
+            {slider('grainAmt', 'Grain amount', 0, 0.3, 0.001)}
+            <div className="space-y-2 border-t border-white/20 pt-3">{toggle('domainWarp', 'Domain warp')}{toggle('depth', 'Depth')}{toggle('vertFlow', 'Vertical flow')}{toggle('vignette', 'Vignette')}{toggle('grain', 'Grain')}{toggle('sunrise', 'Sunrise')}</div>
+            <div className="space-y-2 border-t border-white/20 pt-3">{color('cSky', 'Sky')}{color('cCloud', 'Cloud')}{color('cShadow', 'Shadow')}{color('cGlow', 'Glow')}</div>
+            <button className="rounded bg-white/15 px-2 py-1 hover:bg-white/25" onClick={() => { settingsRef.current = { ...defaults }; refreshControls((count) => count + 1) }}>Reset</button>
+        </div>
+        )}
     </div>
   )
 }

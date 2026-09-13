@@ -49,6 +49,14 @@ export type SignInProps = {
   socialPosition?: "top" | "bottom"
 }
 
+function DitheredWaveBg() {
+  return (
+    <div className="flex size-full justify-center items-center">
+      <img className="size-full rounded-2xl object-cover aspect-video bg-no-repeat border-2 border-border brightness-95 dark:brightness-85" src="/dithered-wave.png" />
+    </div>
+  );
+}
+
 /**
  * Render the sign-in form UI with email/password, magic link, and social provider options.
  *
@@ -130,13 +138,13 @@ export function SignIn({
   return (
 
     <div className="relative w-full h-[80svh]">
-      {!isMobile && <CloudCanvas />}
+      {!isMobile && <DitheredWaveBg />}
       <Card className={cn("absolute inset-0 left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-full max-w-sm h-fit", className)}>
         <AuthPrompts view="signIn" />
         <ReauthenticationNotice />
         {isMobile && (
           <div className="relative -mx-6 -mt-6 h-44 overflow-hidden">
-            <CloudCanvas />
+            <DitheredWaveBg />
           </div>
         )}
         <CardHeader>
