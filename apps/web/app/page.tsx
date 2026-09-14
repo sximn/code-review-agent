@@ -32,17 +32,10 @@ export default function Page() {
                     border border-slate-200 bg-white px-5 py-3
                     text-sm font-semibold text-slate-900 shadow-sm
                     transition-[border-color,box-shadow,transform] duration-300
-                    before:absolute before:inset-0 before:-z-10
-                    before:translate-x-[-130%] before:skew-x-[-20deg]
-                    before:bg-[linear-gradient(110deg,Defered_35%,rgba(148,163,184,0.18)_50%,transparent_65%)]
-                    before:transition-transform before:duration-700
                     hover:border-slate-300 hover:shadow-md
-                    hover:before:translate-x-[130%]
                     focus-visible:outline-none focus-visible:ring-2
                     focus-visible:ring-slate-900 focus-visible:ring-offset-3
-                    focus-visible:before:translate-x-[130%]
                     motion-reduce:transform-none motion-reduce:transition-none
-                    motion-reduce:before:transition-none
                     dark:border-white/15 dark:bg-white/80 dark:text-black
                     dark:hover:border-white/25 dark:hover:bg-white/85
                   "
