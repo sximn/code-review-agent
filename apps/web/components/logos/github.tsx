@@ -16,7 +16,9 @@ const GithubLogo = forwardRef<SVGSVGElement, GithubLogoProps>(
       xmlns="http://www.w3.org/2000/svg"
       className={`lucide lucide-github ${className}`}
       color={color}
-      aria-hidden={props["aria-label"] ? undefined : true}
+      aria-hidden={
+        props["aria-label"] || props["aria-labelledby"] ? undefined : true
+      }
       {...props}
     >
       <path
