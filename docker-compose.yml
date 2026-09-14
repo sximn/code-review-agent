@@ -1,0 +1,95 @@
+name: code-review-agent-system
+
+services:
+  migrate:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      target: migration
+    env_file: ${ENV_FILE:-.env}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app
+    restart: "no"
+    command: ["pnpm", "db:migrate"]
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ${ENV_FILE:-.env}
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      # dragonfly:
+      #   condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  postgres:
+    image: postgres:18.6
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  drizzle-studio:
+    image: ghcr.io/drizzle-team/gateway:latest
+    container_name: drizzle-studio
+    restart: always
+    environment:
+      MASTERPASS: ${DRIZZLE_STUDIO_PASSWORD}
+    ports:
+      - '4983:4983'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app
+    command: ['sh', '-c', 'pnpm db:studio --host=0.0.0.0 --port=4983']
+    volumes:
+      - drizzle_studio:/app
+
+volumes:
+  postgres_data:
+
+networks:
+  app:
+    driver: bridge
