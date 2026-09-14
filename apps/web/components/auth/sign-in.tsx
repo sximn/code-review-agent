@@ -52,7 +52,12 @@ export type SignInProps = {
 function DitheredWaveBg() {
   return (
     <div className="flex size-full justify-center items-center">
-      <img className="size-full rounded-2xl object-cover aspect-video bg-no-repeat border-2 border-border brightness-95 dark:brightness-85" src="/dithered-wave.png" />
+      <img
+        alt="Dithered wave"
+        aria-hidden="true"
+        className="size-full rounded-2xl object-cover aspect-video bg-no-repeat border-2 border-border brightness-95 dark:brightness-85"
+        src="/dithered-wave.png"
+      />
     </div>
   );
 }
