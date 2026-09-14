@@ -1,4 +1,11 @@
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -70,4 +77,24 @@ export const verification = pgTable(
       .notNull(),
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
+);
+
+export const repository = pgTable(
+  "repository",
+  {
+    id: text("id").primaryKey(),
+    fullName: text("full_name").notNull(),
+    isPrivate: boolean("is_private").default(false).notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("repository_user_id_idx").on(table.userId),
+    uniqueIndex("repository_user_full_name_idx").on(
+      table.userId,
+      table.fullName,
+    ),
+  ],
 );

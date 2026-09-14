@@ -7,6 +7,7 @@ export const relations = defineRelations(
     user: {
       sessions: r.many.session(),
       accounts: r.many.account(),
+      repositories: r.many.repository(),
     },
 
     session: {
@@ -19,6 +20,13 @@ export const relations = defineRelations(
     account: {
       user: r.one.user({
         from: r.account.userId,
+        to: r.user.id,
+      }),
+    },
+
+    repository: {
+      user: r.one.user({
+        from: r.repository.userId,
         to: r.user.id,
       }),
     },
