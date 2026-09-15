@@ -23,7 +23,6 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
     restart: unless-stopped
-    env_file: ${ENV_FILE:-.env}
     environment:
       NODE_ENV: production
       REDIS_URL: redis://:${REDIS_PASSWORD}@dragonfly:6379/0
@@ -35,6 +34,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      WORKER_API_TOKEN: ${WORKER_API_TOKEN}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -50,6 +50,24 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+  worker:
+    build:
+      context: ./apps/worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ${ENV_FILE:-.env}
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD}@dragonfly:6379/0
+      WEB_SERVICE_URL: http://web:3000
+      WORKER_API_TOKEN: ${WORKER_API_TOKEN}
+    depends_on:
+      web:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+    networks:
+      - app
 
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2
