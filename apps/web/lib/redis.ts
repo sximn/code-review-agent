@@ -1,15 +1,11 @@
 import { createClient } from "redis";
+import env from '@/lib/environment';
 
 let redis: ReturnType<typeof createClient> | undefined;
 
 export async function getRedis() {
   if (!redis) {
-    const url = process.env.REDIS_URL;
-    if (!url) {
-      throw new Error("REDIS_URL is required at runtime");
-    }
-
-    redis = createClient({ url });
+    redis = createClient({ url: env.REDIS_URL });
     redis.on("error", (error) => console.error("Redis error", error));
   }
 
