@@ -1,13 +1,18 @@
 import { useState } from "react"
-import { useInfiniteQuery } from "@tanstack/react-query"
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { AnimatePresence, motion } from "motion/react"
 import {
   CheckCircle2,
   ChevronDown,
+  CircleX,
   ExternalLink,
   GitPullRequest,
   LoaderCircle,
-  LoaderPinwheel,
   Send,
 } from "lucide-react"
 import { ConnectedRepository } from "@/lib/dashboard"
@@ -19,6 +24,22 @@ const PULL_REQUESTS_PER_PAGE = 25;
 type PullRequestsPage = {
   pullRequests: PullRequest[]
   nextPage: number | null
+}
+
+type ReviewStatus = "scheduled" | "running" | "failed" | "finished"
+
+type RepositoryReview = {
+  id: string
+  pullRequestNumber: number
+  status: ReviewStatus
+  error: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  createdAt: string
+}
+
+type ReviewsResponse = {
+  reviews: RepositoryReview[]
 }
 
 async function fetchPullRequests({
@@ -52,6 +73,38 @@ async function fetchPullRequests({
   return response.json()
 }
 
+async function fetchReviews(
+  repositoryName: string,
+  signal?: AbortSignal,
+): Promise<ReviewsResponse> {
+  const params = new URLSearchParams({ repository: repositoryName })
+  const response = await fetch(`/api/reviews?${params}`, { signal })
+
+  if (!response.ok) {
+    throw new Error("Review statuses could not be loaded.")
+  }
+
+  return response.json()
+}
+
+async function createReview(
+  repositoryName: string,
+  pullRequestNumber: number,
+): Promise<{ review: RepositoryReview }> {
+  const params = new URLSearchParams({
+    repository: repositoryName,
+    pullRequestNumber: String(pullRequestNumber),
+  })
+  const response = await fetch(`/api/reviews?${params}`, { method: "POST" })
+  const body = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(body?.error ?? "The review could not be started.")
+  }
+
+  return body
+}
+
 export function RepositoryRow({
   repo,
   index,
@@ -60,10 +113,39 @@ export function RepositoryRow({
   index: number
 }) {
   const [expanded, setExpanded] = useState(false)
-
-  const reviewedPullRequests = 0; // TODO: `repo.reviewedPullRequests ?? 0`
-  const reviewInProgress = false; // TODO: Boolean(repo.reviewInProgress)``
+  const queryClient = useQueryClient()
   const panelId = `repository-${repo.id}-pull-requests`;
+
+  const reviewsQuery = useQuery({
+    queryKey: ["repository-reviews", repo.id],
+    queryFn: ({ signal }) => fetchReviews(repo.name, signal),
+    refetchInterval: (query) => {
+      const data = query.state.data as ReviewsResponse | undefined
+      return data?.reviews.some((review) =>
+        review.status === "scheduled" || review.status === "running"
+      )
+        ? 2000
+        : false
+    },
+  })
+
+  const createReviewMutation = useMutation({
+    mutationFn: (pullRequestNumber: number) =>
+      createReview(repo.name, pullRequestNumber),
+    onSuccess: ({ review: createdReview }) => {
+      queryClient.setQueryData<ReviewsResponse>(
+        ["repository-reviews", repo.id],
+        (current) => ({
+          reviews: [
+            createdReview,
+            ...(current?.reviews.filter(
+              (review) => review.id !== createdReview.id,
+            ) ?? []),
+          ],
+        }),
+      )
+    },
+  })
 
   const pullRequestsQuery = useInfiniteQuery({
     queryKey: ["repository-pull-requests", repo.id],
@@ -84,10 +166,13 @@ export function RepositoryRow({
 
   const pullRequests =
     pullRequestsQuery.data?.pages.flatMap((page) => page.pullRequests) ?? []
-
-  function submitForReview() {
-    
-  }
+  const reviews = reviewsQuery.data?.reviews ?? []
+  const reviewInProgress = reviewsQuery.data
+    ? reviews.some(
+        (review) => review.status === "scheduled" || review.status === "running",
+      )
+    : repo.reviewInProgress
+  const reviewedPullRequests = repo.reviewedPullRequests
 
   return (
     <motion.li
@@ -214,8 +299,19 @@ export function RepositoryRow({
               ) : (
                 <>
                   <ul className="divide-y divide-border/70">
-                    {pullRequests.map((pullRequest) => (
-                      <li
+                    {pullRequests.map((pullRequest) => {
+                      const latestReview = reviews.find(
+                        (review) =>
+                          review.pullRequestNumber === pullRequest.number,
+                      )
+                      const isStarting =
+                        createReviewMutation.isPending &&
+                        createReviewMutation.variables === pullRequest.number
+                      const isActive =
+                        latestReview?.status === "scheduled" ||
+                        latestReview?.status === "running"
+
+                      return <li
                         key={`${repo.name}-${pullRequest.number}`}
                         className="flex justify-between py-1 first:pt-0 last:pb-0"
                       >
@@ -255,16 +351,45 @@ export function RepositoryRow({
 
                         <Button
                           size="sm"
-                          className="relative"
-                          onClick={submitForReview}
+                          className="ml-3"
+                          disabled={isStarting || isActive}
+                          variant={latestReview?.status === "failed" ? "outline" : "default"}
+                          onClick={() =>
+                            createReviewMutation.mutate(pullRequest.number)
+                          }
                         >
-                          review
-                          <Send className="opacity-0"/>
-                          <Send className="absolute right-2 top-1.45"/>
+                          {isStarting || isActive ? (
+                            <LoaderCircle className="animate-spin" />
+                          ) : latestReview?.status === "finished" ? (
+                            <CheckCircle2 />
+                          ) : latestReview?.status === "failed" ? (
+                            <CircleX />
+                          ) : (
+                            <Send />
+                          )}
+                          {isStarting
+                            ? "Starting"
+                            : latestReview?.status === "scheduled"
+                              ? "Queued"
+                              : latestReview?.status === "running"
+                                ? "Reviewing"
+                                : latestReview?.status === "finished"
+                                  ? "Review again"
+                                  : latestReview?.status === "failed"
+                                    ? "Retry"
+                                    : "Review"}
                         </Button>
                       </li>
-                    ))}
+                    })}
                   </ul>
+
+                  {createReviewMutation.isError && (
+                    <p className="mt-2 text-right text-xs text-destructive">
+                      {createReviewMutation.error instanceof Error
+                        ? createReviewMutation.error.message
+                        : "The review could not be started."}
+                    </p>
+                  )}
 
                   {pullRequestsQuery.hasNextPage && (
                     <div className="mt-3 border-t border-border/70 pt-3 text-center">
