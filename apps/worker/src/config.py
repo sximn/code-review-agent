@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,10 +13,13 @@ class AppConfig(BaseSettings):
     )
 
     agent_mode: Literal["live", "mock"] = Field(default="mock")
-    openai_api_key: str = Field(min_length=1)
-    model: str = Field(min_length=1)
+    openai_api_key: str | None = None
+    model: str = Field(default="gpt-4o-mini", min_length=1)
+    github_token: str | None = None
 
     redis_url: str = Field(min_length=1)
+    web_service_url: str = Field(min_length=1)
+    worker_api_token: str = Field(min_length=32)
 
     job_stream: str = Field(min_length=1)
     group_name: str = Field(min_length=1)
@@ -31,3 +34,11 @@ class AppConfig(BaseSettings):
     sandbox_controller_url: str = Field(min_length=1)
     command_timeout_seconds: int = Field(default=60)
     sandbox_controller_token: str = Field(min_length=1)
+    worker_concurrency: int = Field(default=2, ge=1, le=16)
+
+    @model_validator(mode="after")
+    def validate_live_agent_config(self) -> "AppConfig":
+        if self.agent_mode == "live" and not self.openai_api_key:
+            raise ValueError("OPENAI_API_KEY is required when AGENT_MODE=live")
+
+        return self
