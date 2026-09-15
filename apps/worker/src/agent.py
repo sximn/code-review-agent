@@ -1,20 +1,27 @@
-from openai import OpenAI
-from pydantic.dataclasses import dataclass
+import json
+from typing import Any, Literal
 
-from .env import environment
+from openai import AsyncOpenAI
+from openai.types.chat.completion_create_params import (
+    ChatCompletionMessageParam,
+    CompletionCreateParamsNonStreaming,
+)
+from pydantic import BaseModel, ConfigDict, Field
+
+from .sandbox_client import SandboxClient
 
 
-@dataclass
-class PRMetadata:
+class PRMetadata(BaseModel):
     title: str
     description: str
     diff: str
 
 
-@dataclass
-class Finding:
-    category: str
-    severity: str
+class Finding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category: Literal["quality", "performance", "security"]
+    severity: Literal["critical", "high", "medium", "low"]
     title: str
     description: str
     file: str
@@ -22,22 +29,15 @@ class Finding:
     line_end: int | None
     evidence: str
     recommendation: str
-    confidence: float
+    confidence: float = Field(ge=0, le=1)
 
 
-@dataclass
-class Review:
-    pr_metadata: PRMetadata
-    changed_files: list[dict]
+class Review(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    quality_findings: list[Finding]
-    performance_findings: list[Finding]
-    security_findings: list[Finding]
-
+    findings: list[Finding]
     approval_granted: bool
 
-
-client = OpenAI(api_key=environment.openai_api_key)
 
 SYSTEM_PROMPT = """You are an expert software code-review agent.
 
@@ -261,15 +261,120 @@ For `category`, use exactly one of:
 - `performance`
 - `security`
 
-If there are no findings for a category, return an empty list.
+If there are no findings, return an empty `findings` list.
 
 Do not include additional fields that are not part of the schema.
 """
 
 
-def run_agent_review(pr_metadata: PRMetadata):
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+SANDBOX_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "sandbox_exec",
+        "description": (
+            "Run a command inside the isolated pull-request checkout. Use this to "
+            "inspect files, search code, or run focused tests and static analysis."
+        ),
+        "strict": True,
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "description": "Executable and arguments; do not use a shell string.",
+                },
+                "cwd": {
+                    "type": "string",
+                    "description": "Working directory under /workspace/repo.",
+                    "default": "/workspace/repo",
+                },
+            },
+            "required": ["command"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+MAX_TOOL_OUTPUT_CHARS = 40_000
+
+
+def _validate_tool_arguments(arguments: str) -> tuple[list[str], str]:
+    parsed = json.loads(arguments)
+    command = parsed.get("command")
+    cwd = parsed.get("cwd", "/workspace/repo")
+
+    if (
+        not isinstance(command, list)
+        or not command
+        or not all(isinstance(part, str) and part for part in command)
+    ):
+        raise ValueError("command must be a non-empty list of strings")
+
+    if len(command) > 50:
+        raise ValueError("command has too many arguments")
+
+    if not isinstance(cwd, str) or not (
+        cwd == "/workspace/repo" or cwd.startswith("/workspace/repo/")
+    ):
+        raise ValueError("cwd must be inside /workspace/repo")
+
+    return command, cwd
+
+
+def _tool_result(result: dict[str, Any]) -> str:
+    safe_result = {
+        "exit_code": result.get("exit_code"),
+        "stdout": str(result.get("stdout", ""))[:MAX_TOOL_OUTPUT_CHARS],
+        "stderr": str(result.get("stderr", ""))[:MAX_TOOL_OUTPUT_CHARS],
+    }
+    return json.dumps(safe_result)
+
+
+async def run_mock_agent_review(_: PRMetadata) -> Review:
+    return Review(findings=[], approval_granted=True)
+
+
+async def run_agent_review(
+    pr_metadata: PRMetadata,
+    model: str,
+    api_key: str,
+    max_steps: int,
+    sandbox: SandboxClient | None = None,
+    sandbox_id: str | None = None,
+) -> Review:
+    async with AsyncOpenAI(api_key=api_key) as client:
+        return await _run_agent_review(
+            client,
+            pr_metadata,
+            model,
+            max_steps,
+            sandbox,
+            sandbox_id,
+        )
+
+
+async def _run_agent_review(
+    client: AsyncOpenAI,
+    pr_metadata: PRMetadata,
+    model: str,
+    max_steps: int,
+    sandbox: SandboxClient | None,
+    sandbox_id: str | None,
+) -> Review:
+    messages: list[ChatCompletionMessageParam] = [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT
+            + (
+                "\nA sandbox_exec tool is available. Use it when repository context "
+                "or focused test output is needed to verify a potential finding."
+                if sandbox is not None
+                else ""
+            ),
+        },
         {
             "role": "user",
             "content": f"""
@@ -283,11 +388,54 @@ def run_agent_review(pr_metadata: PRMetadata):
             """,
         },
     ]
-    response = client.chat.completions.create(
-        model=environment.model,
-        messages=messages,
-    )
-    review = response.choices[0].message.content
-    messages.append(review)
 
-    return review
+    for _ in range(max_steps):
+        request: CompletionCreateParamsNonStreaming = {
+            "model": model,
+            "messages": messages,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "code_review",
+                    "strict": True,
+                    "schema": Review.model_json_schema(),
+                },
+            },
+        }
+        if sandbox is not None and sandbox_id is not None:
+            request.update(tools=[SANDBOX_TOOL], tool_choice="auto")
+
+        response = await client.chat.completions.create(**request)
+        message = response.choices[0].message
+        messages.append(message.model_dump(exclude_none=True))
+
+        if not message.tool_calls:
+            if not message.content:
+                raise RuntimeError("The agent returned an empty review.")
+            # we assume here that the validation will pass,
+            # since we provided strict json schema in the response_format parameter
+            # ... so we rely on OpenAI to ensure the schema for us -> otherwise
+            #     we can wrap it in try-catch and feed the error back to the model until it passes
+            return Review.model_validate_json(message.content)
+
+        for tool_call in message.tool_calls:
+            try:
+                if sandbox is None or sandbox_id is None:
+                    raise RuntimeError("The sandbox is not available.")
+                if tool_call.function.name != "sandbox_exec":
+                    raise ValueError(f"Unknown tool: {tool_call.function.name}")
+                command, cwd = _validate_tool_arguments(tool_call.function.arguments)
+                result = await sandbox.exec(sandbox_id, command, cwd)
+                content = _tool_result(result)
+            except Exception as exc:
+                content = json.dumps({"error": str(exc)[:2000]})
+
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": content,
+                }
+            )
+
+    raise RuntimeError(f"The agent exceeded the {max_steps}-step limit.")
