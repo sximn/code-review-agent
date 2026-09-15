@@ -29,6 +29,14 @@ export const relations = defineRelations(
         from: r.repository.userId,
         to: r.user.id,
       }),
+      reviews: r.many.review(),
+    },
+
+    review: {
+      repository: r.one.repository({
+        from: r.review.repositoryId,
+        to: r.repository.id,
+      }),
     },
   }),
 );

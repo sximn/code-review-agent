@@ -1,11 +1,33 @@
+import { randomUUID } from "node:crypto";
+
 import { db } from "@/db/drizzle";
-import { repository as repositoryTable } from "@/db/schema";
+import { repository as repositoryTable, review } from "@/db/schema";
 import { auth } from "@/lib/auth"
+import { getRepositoryReviews } from "@/lib/dashboard";
 import { enqueueReviewJob } from "@/lib/queue";
 import { checkRepositoryRequest } from "@/lib/repositories"
 import { and, eq } from "drizzle-orm";
-import env from "@/lib/environment";
 import { getAsPositiveInteger } from "@/lib/nums";
+
+export async function GET(request: Request) {
+  const session = await auth.api.getSession({ headers: request.headers })
+
+  if (!session) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const repoCheck = await checkRepositoryRequest(request)
+  if (!repoCheck.success) {
+    return Response.json({ error: repoCheck.error }, { status: 400 })
+  }
+
+  const reviews = await getRepositoryReviews(
+    session.user.id,
+    repoCheck.repository,
+  )
+
+  return Response.json({ reviews })
+}
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
@@ -50,15 +72,45 @@ export async function POST(request: Request) {
       );
     }
 
-    const jobEnqueue = enqueueReviewJob({
-      repository: repoCheck.repository,
-      pull_request: pullRequestNumber,
-    });
+    const reviewId = randomUUID()
+    const [createdReview] = await db
+      .insert(review)
+      .values({
+        id: reviewId,
+        repositoryId: connectedRepository.id,
+        pullRequestNumber,
+        status: "scheduled",
+      })
+      .returning()
 
-    return Response.json({ text: "created" }, { status: 201 })
-  } catch {
+    try {
+      await enqueueReviewJob(reviewId, {
+        repository: repoCheck.repository,
+        pull_request: pullRequestNumber,
+      })
+    } catch (error) {
+      console.error("Could not enqueue review", error)
+      await db
+        .update(review)
+        .set({
+          status: "failed",
+          error: "The review could not be queued.",
+          finishedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(review.id, reviewId))
+
+      return Response.json(
+        { error: "The review could not be queued. Please try again." },
+        { status: 502 },
+      )
+    }
+
+    return Response.json({ review: createdReview }, { status: 201 })
+  } catch (error) {
+    console.error("Could not create review", error)
     return Response.json(
-      { error: "We couldn't connect this repository. Please try again." },
+      { error: "We couldn't create this review. Please try again." },
       { status: 502 },
     )
   }

@@ -1,9 +1,12 @@
 import {
   pgTable,
+  pgEnum,
   text,
   timestamp,
   boolean,
+  integer,
   index,
+  jsonb,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -97,4 +100,30 @@ export const repository = pgTable(
       table.fullName,
     ),
   ],
+);
+
+export const reviewStatusEnum = pgEnum("review_status", [
+  "scheduled",
+  "running",
+  "failed",
+  "finished",
+]);
+
+export const review = pgTable(
+  "review",
+  {
+    id: text("id").primaryKey(),
+    repositoryId: text("repository_id")
+      .notNull()
+      .references(() => repository.id, { onDelete: "cascade" }),
+    pullRequestNumber: integer("pull_request_number").notNull(),
+    status: reviewStatusEnum().default("scheduled").notNull(),
+    result: jsonb("result"),
+    error: text("error"),
+    startedAt: timestamp("started_at"),
+    finishedAt: timestamp("finished_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("review_repository_id_idx").on(table.repositoryId)],
 );

@@ -13,6 +13,7 @@ const envSchema = z.object({
 
   JOB_STREAM: z.string(),
   REVIEW_JOB_NAME: z.string(),
+  WORKER_API_TOKEN: z.string().min(32),
 });
 
 const env = envSchema.parse(process.env);

@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { getRedis } from "./redis";
 import env from "@/lib/environment";
 
@@ -8,10 +7,11 @@ export type ReviewJobPayload = {
   pull_request: number;
 }
 
-export async function enqueueReviewJob(payload: ReviewJobPayload) {
+export async function enqueueReviewJob(
+  jobId: string,
+  payload: ReviewJobPayload,
+) {
   const redis = await getRedis();
-
-  const jobId = randomUUID();
 
   const streamId = await redis.xAdd(
     env.JOB_STREAM,
