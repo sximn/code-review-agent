@@ -1,7 +1,7 @@
 from openai import OpenAI
 from pydantic.dataclasses import dataclass
 
-from apps.worker.src.env import environment
+from .env import environment
 
 
 @dataclass
