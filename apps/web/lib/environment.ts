@@ -12,6 +12,7 @@ const envSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string(),
 
   JOB_STREAM: z.string(),
+  REVIEW_JOB_NAME: z.string(),
 });
 
 const env = envSchema.parse(process.env);
