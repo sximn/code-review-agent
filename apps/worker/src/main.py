@@ -2,8 +2,8 @@ import sys
 
 import requests
 
-from agent import PRMetadata, run_agent_review
-from pr_diff import GitHubError, fetch_pr
+from apps.worker.src.agent import PRMetadata, run_agent_review
+from apps.worker.src.pr_diff import GitHubError, fetch_pr
 
 
 def main() -> int:
