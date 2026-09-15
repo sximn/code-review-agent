@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 
 import { RepositorySetupWizard } from "./repository-setup/repository-setup-wizard"
 import { ConnectedRepository } from "@/lib/dashboard"
+import { RepositoryRow } from "./connected-repositories/repository-row"
 
 type RepositoryWorkspaceProps = {
   isEmpty: boolean
@@ -35,7 +36,7 @@ export function RepositoryWorkspace({
         configuring ? "repository-setup-heading" : "review-space-heading"
       }
       className={[
-        "relative isolate mx-auto mt-4 w-full max-w-260 h-fit overflow-hidden rounded-[15px] border border-border",
+        "relative isolate mx-auto mt-4 w-full max-w-260 overflow-hidden rounded-[15px] border border-border",
         "bg-[linear-gradient(135deg,#f4f8ff,#fff_52%,#f3f7ff)]",
         "dark:bg-[linear-gradient(135deg,#070d1a,#0d121f_52%,#060914)]",
         "dark:shadow-[0_16px_40px_rgba(0,0,0,0.25)]",
@@ -114,7 +115,7 @@ function EmptyRepositoryState({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -18, scale: 0.985 }}
       transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-      className="absolute inset-0 grid place-items-center"
+      className={"relative grid min-h-105 place-items-center"/*"absolute inset-0 grid place-items-center"*/}
     >
       <motion.div layout="position" className="relative flex max-w-md flex-col items-center p-7.5 text-center">
         <div className="grid size-10 place-items-center rounded-xl border border-border bg-background text-foreground shadow-sm">
@@ -148,7 +149,7 @@ function ConnectedRepositories({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -18, scale: 0.985 }}
       transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-      className="absolute inset-0 overflow-y-auto"
+      className={"relative"/*"absolute inset-0 overflow-y-auto"*/}
     >
       <motion.div
         layout="position"
@@ -175,6 +176,12 @@ function ConnectedRepositories({
         </div>
 
         <motion.ul layout className="mt-3 grid gap-3">
+          {repositories.map((repo, index) => (
+            <RepositoryRow key={repo.id} repo={repo} index={index} />
+          ))}
+        </motion.ul>
+
+        {/* <motion.ul layout className="mt-3 grid gap-3">
           {repositories.map((repo, index) => {
             const reviewedPullRequests = 0;// TODO: `repo.reviewedPullRequests ?? 0`
             const reviewInProgress = false // TODO: `Boolean(repo.reviewInProgress)`
@@ -237,7 +244,7 @@ function ConnectedRepositories({
               </motion.li>
             )
           })}
-        </motion.ul>
+        </motion.ul> */}
       </motion.div>
     </motion.div>
   )

@@ -9,5 +9,6 @@ export function normalizeRepository(value: string): string {
 }
 
 export function isRepositoryName(value: string): boolean {
+  console.log({value});
   return REPOSITORY_PATTERN.test(value)
 }
