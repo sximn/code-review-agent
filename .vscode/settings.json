@@ -1,4 +1,13 @@
 {
+    "python-envs.pythonProjects": [
+        {
+            "path": "apps/worker",
+            "envManager": "ms-python.python:system",
+            "packageManager": "ms-python.python:pip"
+        }
+    ],
+    "ruff.configurationPreference": "filesystemFirst",
+
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
         "diffEditor.ignoreTrimWhitespace": true,

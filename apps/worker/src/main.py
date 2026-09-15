@@ -1,9 +1,9 @@
 import sys
 
-import requests
+import httpx
 
-from apps.worker.src.agent import PRMetadata, run_agent_review
-from apps.worker.src.pr_diff import GitHubError, fetch_pr
+from .agent import PRMetadata, run_agent_review
+from .pull_request import GitHubError, fetch_pr_metadata
 
 
 def main() -> int:
@@ -15,7 +15,7 @@ def main() -> int:
     pr_number = int(sys.argv[2])
 
     try:
-        pr = fetch_pr(repo, pr_number)
+        pr = fetch_pr_metadata(repo, pr_number)
 
         review = run_agent_review(
             pr_metadata=PRMetadata(
@@ -40,7 +40,7 @@ def main() -> int:
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
-    except requests.RequestException as error:
+    except httpx.HTTPError as error:
         print(f"Network error while contacting GitHub: {error}", file=sys.stderr)
         return 1
 

@@ -1,8 +1,21 @@
 import os
+import urllib
+from dataclasses import dataclass
+from typing import Literal
 
-import requests
+import httpx
 
 API_ROOT = "https://api.github.com"
+
+
+@dataclass
+class PullReuqestMetadata:
+    repository: str
+    visibility: Literal["private", "public"]
+    pr_number: int
+    title: str
+    description: str
+    diff: str
 
 
 class GitHubError(Exception):
@@ -12,7 +25,7 @@ class GitHubError(Exception):
 def github_headers(token: str | None, accept: str) -> dict[str, str]:
     headers = {
         "Accept": accept,
-        "X-GitHub-Api-Version": "2022-11-28",
+        "X-GitHub-Api-Version": "2026-03-10",
     }
 
     if token:
@@ -21,8 +34,8 @@ def github_headers(token: str | None, accept: str) -> dict[str, str]:
     return headers
 
 
-def validate_token(session: requests.Session, token: str) -> None:
-    response = session.get(
+def validate_token(client: httpx.Client, token: str) -> None:
+    response = client.get(
         f"{API_ROOT}/user",
         headers=github_headers(token, "application/vnd.github+json"),
         timeout=30,
@@ -39,20 +52,29 @@ def validate_token(session: requests.Session, token: str) -> None:
     response.raise_for_status()
 
 
-def fetch_pr(repo: str, pr_number: int):
+def uriEncode(part: str) -> str:
+    return urllib.parse.quote(part, safe="~()*!.'-")
+
+
+def fetch_pr_metadata(repo: str, pr_number: int) -> PullReuqestMetadata:
     token = os.getenv("GITHUB_TOKEN")
 
-    with requests.Session() as session:
+    with httpx.Client() as client:
         # if present, verify the token before request
         if token:
             try:
-                validate_token(session, token)
+                validate_token(client, token)
             except GitHubError as error:
                 raise GitHubError(str(error)) from error
 
+        owner, name = repo.split("/")
+        if owner is None or name is None:
+            raise RuntimeError("Received malformered repository handle.")
+
         # check if the repository is visible to this request
-        repo_response = session.get(
-            f"{API_ROOT}/repos/{repo}",
+        repo_url = f"{API_ROOT}/repos/{uriEncode(owner)}/{uriEncode(name)}"
+        repo_response = client.get(
+            repo_url,
             headers=github_headers(token, "application/vnd.github+json"),
             timeout=30,
         )
@@ -83,9 +105,9 @@ def fetch_pr(repo: str, pr_number: int):
         visibility = "private" if repo_data["private"] else "public"
 
         # fetch PR metadata: title + description
-        pr_url = f"{API_ROOT}/repos/{repo}/pulls/{pr_number}"
+        pr_url = f"{repo_url}/pulls/{pr_number}"
 
-        metadata_response = session.get(
+        metadata_response = client.get(
             pr_url,
             headers=github_headers(token, "application/vnd.github+json"),
             timeout=30,
@@ -109,7 +131,7 @@ def fetch_pr(repo: str, pr_number: int):
         metadata = metadata_response.json()
 
         # fetch the unified diff
-        diff_response = session.get(
+        diff_response = client.get(
             pr_url,
             headers=github_headers(token, "application/vnd.github.v3.diff"),
             timeout=30,
