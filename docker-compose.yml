@@ -89,6 +89,7 @@ services:
 
 volumes:
   postgres_data:
+  drizzle_studio:
 
 networks:
   app:
