@@ -25,5 +25,8 @@
         "**/app/**/template.tsx": "${dirname(1)}/${dirname} - template.tsx",
         "**/app/**/default.tsx": "${dirname(1)}/${dirname} - default.tsx",
         "**/app/**/route.ts": "${dirname(1)}/${dirname} - route.ts"
+    },
+    "[javascript][javascriptreact][typescript][typescriptreact]": {
+        "editor.tabSize": 2,
     }
 }
