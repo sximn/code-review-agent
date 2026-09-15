@@ -26,6 +26,7 @@ services:
     env_file: ${ENV_FILE:-.env}
     environment:
       NODE_ENV: production
+      REDIS_URL: redis://:${REDIS_PASSWORD}@dragonfly:6379/0
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
       MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
@@ -49,6 +50,34 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2
+    restart: unless-stopped
+    environment:
+      DFLY_requirepass: ${REDIS_PASSWORD}
+    command:
+      - --maxmemory=256mb
+      - --dir=/data
+      - --dbfilename=jobs-dump
+      # no need for the http console
+      - --primary_port_http_enabled=false
+    volumes:
+      - dragonfly-data:/data
+    networks:
+      - app
+    # leave room above maxmemory is for internal management
+    mem_limit: 512m
+    cpus: 0.5
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   postgres:
     image: postgres:18.6
@@ -88,6 +117,7 @@ services:
       - drizzle_studio:/app
 
 volumes:
+  dragonfly-data:
   postgres_data:
   drizzle_studio:
 
