@@ -1,14 +1,20 @@
+import asyncio
+import base64
 import json
 import logging
 import os
 import socket
-import time
 from typing import Any
 
-from redis import Redis
+import httpx
+from redis.asyncio import Redis
+from redis.exceptions import RedisError, ResponseError
 
+from .agent import PRMetadata, run_agent_review, run_mock_agent_review
 from .config import AppConfig
-from .pull_request import uriEncode
+from .pull_request import fetch_pr_metadata, uriEncode
+from .review_state_client import ReviewStateClient
+from .sandbox_client import SandboxClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -16,181 +22,423 @@ logger = logging.getLogger(__name__)
 CONSUMER_NAME = f"{socket.gethostname()}-{os.getpid()}"
 
 
-def job_key(job_id: str) -> str:
-    return f"repo-analyzer:job:{job_id}"
+class InvalidJobError(ValueError):
+    pass
 
 
-async def set_state(redis: Redis, job_id: str, status: str, **values: str) -> None:
-    fields = {"status": status, **values}
-    await redis.hset(job_key(job_id), mapping=fields)
+def _git_environment(github_token: str | None) -> dict[str, str]:
+    environment = {"GIT_TERMINAL_PROMPT": "0"}
+    if not github_token:
+        return environment
+
+    credentials = base64.b64encode(f"x-access-token:{github_token}".encode()).decode()
+    environment.update(
+        {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
+            "GIT_CONFIG_VALUE_0": f"AUTHORIZATION: basic {credentials}",
+        }
+    )
+    return environment
 
 
-def review_pull_request(
-    job_id: str, payload: Any, redis: Redis, config: AppConfig
+def _command_error(label: str, result: dict[str, Any]) -> RuntimeError:
+    stderr = str(result.get("stderr", ""))[:2000]
+    return RuntimeError(f"{label} failed: {stderr or 'unknown command error'}")
+
+
+async def _require_command(
+    sandbox: SandboxClient,
+    sandbox_id: str,
+    command: list[str],
+    cwd: str = "/workspace/repo",
+    env: dict[str, str] | None = None,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    result = await sandbox.exec(sandbox_id, command, cwd, env)
+    if result.get("exit_code") != 0:
+        raise _command_error(label, result)
+    return result
+
+
+async def review_pull_request(
+    job_id: str,
+    payload: dict[str, Any],
+    config: AppConfig,
+    state_client: ReviewStateClient,
+    github_client: httpx.AsyncClient,
 ) -> None:
-    repository, pr_number = (
-        payload.get("repository", ""),
-        payload.get("pull_request", ""),
+    repository = payload.get("repository")
+    pr_number = payload.get("pull_request")
+
+    if not isinstance(repository, str) or repository.count("/") != 1:
+        raise ValueError("Received malformed repository handle.")
+    if not isinstance(pr_number, int) or pr_number < 1:
+        raise ValueError("Missing or invalid pull request ID.")
+
+    owner, name = repository.split("/", maxsplit=1)
+    if not owner or not name:
+        raise ValueError("Received malformed repository handle.")
+
+    repository_url = f"https://github.com/{uriEncode(owner)}/{uriEncode(name)}.git"
+    git_environment = _git_environment(config.github_token)
+    sandbox_id: str | None = None
+    result: dict[str, Any] | None = None
+    failure: str | None = None
+
+    current_status = await state_client.set_state(job_id, "running")
+    if current_status in {"failed", "finished"}:
+        logger.info(
+            "Review %s is already terminal with status=%s",
+            job_id,
+            current_status,
+        )
+        return
+
+    sandbox = SandboxClient(
+        config.sandbox_controller_url,
+        config.command_timeout_seconds,
+        config.sandbox_controller_token,
     )
 
-    owner, name = repository.split("/")
-    if owner is None or name is None:
-        raise RuntimeError("Received malformered repository handle.")
-
-    repository_url = f"https://github.com/{uriEncode(owner)}/{uriEncode(name)}"
-
-    if pr_number is None:
-        raise RuntimeError("Missing pull request ID.")
-
-    # TODO: create sandbox + checkout repo + start agent with PR metadata + tool calls -> structured output
-
-
-def ensure_consumer_group(redis: Redis, config: AppConfig) -> None:
     try:
-        redis.xgroup_create(
+        async with asyncio.timeout(config.job_timeout_seconds):
+            metadata = await fetch_pr_metadata(
+                github_client,
+                repository,
+                pr_number,
+                config.github_token,
+            )
+
+            sandbox_id = await sandbox.create(job_id)
+
+            await _require_command(
+                sandbox,
+                sandbox_id,
+                [
+                    "git",
+                    "clone",
+                    "--filter=blob:none",
+                    "--no-checkout",
+                    repository_url,
+                    "/workspace/repo",
+                ],
+                "/workspace",
+                git_environment,
+                label="Repository clone",
+            )
+
+            size = await _require_command(
+                sandbox,
+                sandbox_id,
+                ["du", "-sb", "/workspace/repo"],
+                "/workspace",
+                label="Repository size check",
+            )
+            try:
+                repo_size = int(str(size.get("stdout", "")).split()[0])
+            except (IndexError, ValueError) as exc:
+                raise RuntimeError("Could not determine repository size.") from exc
+            if repo_size > config.max_repo_size_bytes:
+                raise RuntimeError("Repository is too large after the partial clone.")
+
+            for label, revision in (
+                ("Pull request base fetch", metadata["base_sha"]),
+                ("Pull request head fetch", metadata["head_sha"]),
+            ):
+                await _require_command(
+                    sandbox,
+                    sandbox_id,
+                    ["git", "fetch", "--no-tags", "--depth=1", "origin", revision],
+                    env=git_environment,
+                    label=label,
+                )
+
+            await _require_command(
+                sandbox,
+                sandbox_id,
+                ["git", "checkout", "--detach", metadata["head_sha"]],
+                label="Pull request checkout",
+            )
+
+            checkout_size = await _require_command(
+                sandbox,
+                sandbox_id,
+                ["du", "-sb", "/workspace/repo"],
+                "/workspace",
+                label="Checked-out repository size check",
+            )
+            try:
+                repo_size = int(str(checkout_size.get("stdout", "")).split()[0])
+            except (IndexError, ValueError) as exc:
+                raise RuntimeError("Could not determine checkout size.") from exc
+            if repo_size > config.max_repo_size_bytes:
+                raise RuntimeError("Checked-out repository is too large.")
+
+            pr_metadata = PRMetadata(
+                title=metadata["title"],
+                description=metadata["description"],
+                diff=metadata["diff"],
+            )
+            if config.agent_mode == "mock":
+                review = await run_mock_agent_review(pr_metadata)
+            else:
+                if not config.openai_api_key:
+                    raise RuntimeError("OPENAI_API_KEY is missing.")
+                review = await run_agent_review(
+                    pr_metadata,
+                    config.model,
+                    config.openai_api_key,
+                    config.max_steps,
+                    sandbox,
+                    sandbox_id,
+                )
+
+            result = review.model_dump(mode="json")
+    except TimeoutError:
+        failure = (
+            f"The review exceeded the {config.job_timeout_seconds}-second deadline."
+        )
+        logger.exception("Review %s timed out", job_id)
+    except Exception as exc:
+        failure = str(exc)[:2000]
+        logger.exception("Review %s failed", job_id)
+    finally:
+        if sandbox_id:
+            try:
+                await sandbox.destroy(sandbox_id)
+            except Exception:
+                logger.exception("Failed to destroy sandbox %s", sandbox_id)
+        await sandbox.close()
+
+    if failure is not None:
+        await state_client.set_state(
+            job_id,
+            "failed",
+            error=failure,
+        )
+        return
+
+    if result is None:
+        raise RuntimeError("Review completed without a result.")
+    await state_client.set_state(
+        job_id,
+        "finished",
+        result=result,
+    )
+
+
+async def ensure_consumer_group(redis: Redis, config: AppConfig) -> None:
+    try:
+        await redis.xgroup_create(
             name=config.job_stream,
             groupname=config.group_name,
             id="0",
             mkstream=True,
         )
         logger.info("Created consumer group %s", config.group_name)
-    except redis.ResponseError as exc:
+    except ResponseError as exc:
         if "BUSYGROUP" not in str(exc):
             raise
-        logger.info("Consumer group %s already exists", config.GROUP_NAME)
+        logger.info("Consumer group %s already exists", config.group_name)
 
 
-def recover_stale_jobs(redis: Redis, config: AppConfig) -> None:
-    cursor = "0-0"
+async def process_job(
+    fields: dict[str, str],
+    config: AppConfig,
+    state_client: ReviewStateClient,
+    github_client: httpx.AsyncClient,
+) -> None:
+    try:
+        job_id = fields["job_id"]
+        job_type = fields["type"]
+        payload = json.loads(fields["payload"])
+    except (KeyError, json.JSONDecodeError) as exc:
+        raise InvalidJobError(
+            "Job message is missing required fields or JSON."
+        ) from exc
 
-    while True:
-        result = redis.xautoclaim(
-            name=config.job_stream,
-            groupname=config.group_name,
-            consumername=CONSUMER_NAME,
-            min_idle_time=config.job_reclaim_timeout_seconds,
-            start_id=cursor,
-            count=10,
+    logger.info("Processing job_id=%s type=%s", job_id, job_type)
+
+    if job_type != config.review_job_name:
+        raise InvalidJobError(f"Unknown job type: {job_type}")
+    if not isinstance(payload, dict):
+        raise InvalidJobError("Job payload must be a JSON object.")
+
+    repository = payload.get("repository")
+    pr_number = payload.get("pull_request")
+    if (
+        not isinstance(repository, str)
+        or repository.count("/") != 1
+        or not isinstance(pr_number, int)
+        or pr_number < 1
+    ):
+        await state_client.set_state(
+            job_id,
+            "failed",
+            error="The queued review payload is invalid.",
         )
+        return
 
-        # expecitng result to have shape:
-        #
-        # [
-        #   next_cursor,
-        #   [(message_id, fields), ...],
-        #   [deleted_message_ids...],
-        # ]
-        cursor = result[0]
-        messages = result[1]
-
-        for message_id, fields in messages:
-            logger.warning("Reclaimed stale job message_id=%s", message_id)
-
-            process_message(message_id, fields)
-
-        if cursor == "0-0":
-            break
+    await review_pull_request(job_id, payload, config, state_client, github_client)
 
 
-def process_job(fields: dict[str, str], redis: Redis, config: AppConfig) -> None:
-    job_id = fields["job_id"]
-    job_type = fields["type"]
-    payload = json.loads(fields["payload"])
-
-    logger.info(
-        "Processing job_id=%s type=%s",
-        job_id,
-        job_type,
-    )
-
-    if job_type == config.review_job_name:
-        review_pull_request(job_id, payload, redis, config)
-    else:
-        raise ValueError(f"Unknown job type: {job_type}")
-
-
-def process_message(
+async def process_message(
     redis: Redis,
     config: AppConfig,
+    state_client: ReviewStateClient,
+    github_client: httpx.AsyncClient,
     message_id: str,
     fields: dict[str, str],
 ) -> None:
     try:
-        process_job(fields, redis, config)
-
-        acknowledged = redis.xack(
+        await process_job(fields, config, state_client, github_client)
+        acknowledged = await redis.xack(
             config.job_stream,
             config.group_name,
             message_id,
         )
-
         logger.info(
             "Acknowledged message_id=%s result=%s",
             message_id,
             acknowledged,
         )
-
+    except InvalidJobError:
+        logger.exception("Discarding invalid job message_id=%s", message_id)
+        await redis.xack(config.job_stream, config.group_name, message_id)
     except Exception:
         logger.exception(
-            "Job failed; leaving it pending: message_id=%s",
+            "Job could not reach a terminal state; leaving it pending: message_id=%s",
             message_id,
         )
-        # we do not send XACK here intentionally -> wait for it to be retrieved by XAUTOCLAIM
 
 
-def read_new_jobs(redis: Redis, config: AppConfig) -> None:
-    response = redis.xreadgroup(
+async def _process_messages(
+    redis: Redis,
+    config: AppConfig,
+    state_client: ReviewStateClient,
+    github_client: httpx.AsyncClient,
+    messages: list[tuple[str, dict[str, str]]],
+) -> None:
+    await asyncio.gather(
+        *(
+            process_message(
+                redis, config, state_client, github_client, message_id, fields
+            )
+            for message_id, fields in messages
+        )
+    )
+
+
+async def recover_stale_jobs(
+    redis: Redis,
+    config: AppConfig,
+    state_client: ReviewStateClient,
+    github_client: httpx.AsyncClient,
+) -> None:
+    cursor = "0-0"
+
+    while True:
+        result = await redis.xautoclaim(
+            name=config.job_stream,
+            groupname=config.group_name,
+            consumername=CONSUMER_NAME,
+            min_idle_time=config.job_reclaim_timeout_seconds * 1000,
+            start_id=cursor,
+            count=config.worker_concurrency,
+        )
+        cursor = result[0]
+        messages = result[1]
+
+        for message_id, _ in messages:
+            logger.warning("Reclaimed stale job message_id=%s", message_id)
+        if messages:
+            await _process_messages(
+                redis, config, state_client, github_client, messages
+            )
+
+        if cursor == "0-0":
+            break
+
+
+async def read_new_jobs(
+    redis: Redis,
+    config: AppConfig,
+    state_client: ReviewStateClient,
+    github_client: httpx.AsyncClient,
+) -> None:
+    response = await redis.xreadgroup(
         groupname=config.group_name,
         consumername=CONSUMER_NAME,
-        streams={
-            config.job_stream: ">",
-        },
-        count=10,
+        streams={config.job_stream: ">"},
+        count=config.worker_concurrency,
         block=5000,
     )
 
-    if not response:
-        return
+    for _, messages in response or []:
+        await _process_messages(redis, config, state_client, github_client, messages)
 
-    for stream_name, messages in response:
-        for message_id, fields in messages:
-            process_message(
-                message_id,
-                fields,
+
+async def run_worker() -> None:
+    config = AppConfig()
+    redis = Redis.from_url(
+        config.redis_url,
+        decode_responses=True,
+        socket_connect_timeout=5,
+        socket_timeout=15,
+    )
+
+    if config.job_reclaim_timeout_seconds <= config.job_timeout_seconds:
+        logger.warning(
+            "JOB_RECLAIM_TIMEOUT_SECONDS should exceed JOB_TIMEOUT_SECONDS to avoid "
+            "reclaiming a review that is still running."
+        )
+
+    state_client = ReviewStateClient(
+        config.web_service_url,
+        config.worker_api_token,
+    )
+
+    try:
+        async with (
+            state_client,
+            httpx.AsyncClient(timeout=30) as github_client,
+        ):
+            await ensure_consumer_group(redis, config)
+            logger.info(
+                "Worker started stream=%s group=%s consumer=%s concurrency=%s",
+                config.job_stream,
+                config.group_name,
+                CONSUMER_NAME,
+                config.worker_concurrency,
             )
+
+            loop = asyncio.get_running_loop()
+            last_recovery = 0.0
+
+            while True:
+                try:
+                    now = loop.time()
+                    if now - last_recovery >= config.recovery_interval_seconds:
+                        await recover_stale_jobs(
+                            redis, config, state_client, github_client
+                        )
+                        last_recovery = now
+
+                    await read_new_jobs(redis, config, state_client, github_client)
+                except RedisError:
+                    logger.exception("Redis/Dragonfly error; retrying shortly")
+                    await asyncio.sleep(2)
+                except Exception:
+                    logger.exception("Unexpected worker error")
+                    await asyncio.sleep(1)
+    finally:
+        await redis.aclose()
 
 
 def main() -> None:
-    config = AppConfig()
-    redis = Redis.from_url(config.redis_url, decode_responses=True)
-
-    ensure_consumer_group(redis, config)
-    logger.info(
-        "Worker started stream=%s group=%s consumer=%s",
-        config.job_stream,
-        config.group_name,
-        CONSUMER_NAME,
-    )
-
-    last_recovery = 0.0
-
-    while True:
-        try:
-            now = time.monotonic()
-
-            if now - last_recovery >= config.recovery_interval_seconds:
-                recover_stale_jobs()
-                last_recovery = now
-
-            read_new_jobs()
-
-        except redis.RedisError:
-            logger.exception("Dragonfly error; retrying shortly")
-            time.sleep(2)
-
-        except Exception:
-            logger.exception("Unexpected worker error")
-            time.sleep(1)
+    asyncio.run(run_worker())
 
 
 if __name__ == "__main__":
