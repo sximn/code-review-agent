@@ -32,8 +32,23 @@ class SandboxManager:
             f"{prefix}.created-at": datetime.now(UTC).isoformat(),
         }
 
+    def _ensure_sandbox_network(self) -> None:
+        """Create network for the dynamically created containers
+
+        These sandboxes are not part of the docker compose services
+        and are created dynamically. We want them on a separate network.
+        """
+        try:
+            self.client.networks.get(self.config.sandbox_network)
+        except NotFound:
+            self.client.networks.create(
+                self.config.sandbox_network, driver="bridge", check_duplicate=True
+            )
+
     def create(self, job_id: str) -> str:
         with self._create_lock:
+            self._ensure_sandbox_network()
+
             active = self.client.containers.list(
                 all=True,
                 filters={"label": f"{self.config.sandbox_label_prefix}.sandbox=true"},
