@@ -445,7 +445,7 @@ async def _run_agent_review(
 
                 result = await sandbox.exec(sandbox_id, command, cwd)
                 content = _tool_result(result)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 content = json.dumps({"error": str(exc)[:2000]})
 
             messages.append(
