@@ -1,3 +1,4 @@
+import threading
 from datetime import UTC, datetime
 
 import docker
@@ -21,6 +22,7 @@ class SandboxManager:
     def __init__(self, config: SandboxConfig):
         self.config = config
         self.client = docker.from_env()
+        self._create_lock = threading.Lock()
 
     def _labels(self, job_id: str) -> dict[str, str]:
         prefix = self.config.sandbox_label_prefix
@@ -31,32 +33,32 @@ class SandboxManager:
         }
 
     def create(self, job_id: str) -> str:
+        with self._create_lock:
+            container = self.client.containers.create(
+                image=self.config.sandbox_image,
+                name=f"{self.config.sandbox_label_prefix}-job-{job_id}",
+                runtime=self.config.sandbox_runtime,
+                command=["sleep", "infinity"],
+                user="1000:1000",
+                mem_limit=self.config.sandbox_memory,
+                nano_cpus=int(self.config.sandbox_cpus * 1_000_000_000),
+                pids_limit=self.config.sandbox_pids_limit,
+                labels=self._labels(job_id),
+                network=self.config.sandbox_network,
+                tmpfs={"/tmp": "rw,noexec,nosuid,size=256m"},
+                mounts=[],
+            )
+            try:
+                container.start()
+            except Exception:
+                # attempt removal in case create succeeded
+                container.remove(force=True)
+                raise
 
-        container = self.client.containers.create(
-            image=self.config.sandbox_image,
-            name=f"{self.config.sandbox_label_prefix}-job-{job_id}",
-            runtime=self.config.sandbox_runtime,
-            command=["sleep", "infinity"],
-            user="1000:1000",
-            mem_limit=self.config.sandbox_memory,
-            nano_cpus=int(self.config.sandbox_cpus * 1_000_000_000),
-            pids_limit=self.config.sandbox_pids_limit,
-            labels=self._labels(job_id),
-            network=self.config.sandbox_network,
-            tmpfs={"/tmp": "rw,noexec,nosuid,size=256m"},
-            mounts=[],
-        )
-        try:
-            container.start()
-        except Exception:
-            # attempt removal in case create succeeded
-            container.remove(force=True)
-            raise
+            if container.id is None:
+                raise ValueError("Malformed ID-less container")
 
-        if container.id is None:
-            raise ValueError("Malformed ID-less container")
-
-        return container.id
+            return container.id
 
     def get(self, sandbox_id: str):
         try:
