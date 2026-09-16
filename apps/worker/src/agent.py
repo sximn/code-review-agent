@@ -1,9 +1,13 @@
 import json
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from openai import AsyncOpenAI
-from openai.types.chat.completion_create_params import (
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionFunctionToolParam,
     ChatCompletionMessageParam,
+)
+from openai.types.chat.completion_create_params import (
     CompletionCreateParamsNonStreaming,
 )
 from pydantic import BaseModel, ConfigDict, Field
@@ -267,7 +271,7 @@ Do not include additional fields that are not part of the schema.
 """
 
 
-SANDBOX_TOOL = {
+SANDBOX_TOOL: ChatCompletionFunctionToolParam = {
     "type": "function",
     "function": {
         "name": "sandbox_exec",
@@ -407,7 +411,11 @@ async def _run_agent_review(
 
         response = await client.chat.completions.create(**request)
         message = response.choices[0].message
-        messages.append(message.model_dump(exclude_none=True))
+        assistant_message = cast(
+            ChatCompletionAssistantMessageParam,
+            message.model_dump(exclude_none=True),
+        )
+        messages.append(assistant_message)
 
         if not message.tool_calls:
             if not message.content:
@@ -419,12 +427,22 @@ async def _run_agent_review(
             return Review.model_validate_json(message.content)
 
         for tool_call in message.tool_calls:
+            if tool_call.type != "function":
+                content = json.dumps(
+                    {"error": f"Unsupported tool call type: {tool_call.type}"}
+                )
+                continue
+
             try:
                 if sandbox is None or sandbox_id is None:
                     raise RuntimeError("The sandbox is not available.")
-                if tool_call.function.name != "sandbox_exec":
-                    raise ValueError(f"Unknown tool: {tool_call.function.name}")
+
+                function_name = tool_call.function.name
+                if function_name != "sandbox_exec":
+                    raise ValueError(f"Unknown tool: {function_name}")
+
                 command, cwd = _validate_tool_arguments(tool_call.function.arguments)
+
                 result = await sandbox.exec(sandbox_id, command, cwd)
                 content = _tool_result(result)
             except Exception as exc:
