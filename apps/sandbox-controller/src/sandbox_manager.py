@@ -34,6 +34,25 @@ class SandboxManager:
 
     def create(self, job_id: str) -> str:
         with self._create_lock:
+            active = self.client.containers.list(
+                all=True,
+                filters={"label": f"{self.config.sandbox_label_prefix}.sandbox=true"},
+            )
+
+            # container creation and startup are two separate actions.
+            # if a startup fails, created containers may be kept (in a state like "created", "exited", ...)
+            # we remove these stale contaienrs to not count for the concurrency limit
+            active_copy = active[:]
+            # loop over copy to allow us to remove items from the active list
+            for sandbox in active_copy:
+                sandbox.reload()
+                if sandbox.status != "running":
+                    sandbox.remove(force=True)
+                    active.remove(sandbox)
+
+            if len(active) >= self.config.sandbox_max_concurrent:
+                raise RuntimeError("Maximum concurrent sandbox count reached.")
+
             container = self.client.containers.create(
                 image=self.config.sandbox_image,
                 name=f"{self.config.sandbox_label_prefix}-job-{job_id}",
