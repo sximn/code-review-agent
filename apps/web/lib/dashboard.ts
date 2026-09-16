@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm"
 
 import { db } from "@/db/drizzle"
 import { repository, review } from "@/db/schema"
+import { RepositoryReview } from "@/lib/contracts/review"
 
 
 export type ConnectedRepository = {
@@ -61,12 +62,14 @@ export async function getRepositoryReviews(
   return db
     .select({
       id: review.id,
+      repositoryId: review.repositoryId,
       pullRequestNumber: review.pullRequestNumber,
       result: review.result,
       status: review.status,
       error: review.error,
       startedAt: review.startedAt,
       finishedAt: review.finishedAt,
+      updatedAt: review.updatedAt,
       createdAt: review.createdAt,
     })
     .from(review)
@@ -80,9 +83,6 @@ export async function getRepositoryReviews(
     .orderBy(desc(review.createdAt))
     .limit(100);
 }
-
-export type RepositoryReview =
-  Awaited<ReturnType<typeof getRepositoryReviews>>[number];
 
 export async function getRecentReviews(userId: string): Promise<Review[]> {
   void userId
