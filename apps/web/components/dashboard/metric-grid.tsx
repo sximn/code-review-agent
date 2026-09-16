@@ -19,11 +19,12 @@ function Metric({
   return (
     <Card
       className={[
-        "gap-0 rounded-none border-0 bg-transparent p-0 py-2 shadow-none ring-0 sm:px-7",
+        "gap-0 rounded-none border-0 bg-transparent p-0 py-2 shadow-none ring-0",
+        "sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:px-7",
         bordered ? "sm:border-r sm:border-border/50" : "",
       ].join(" ")}
     >
-      <dl>
+      <dl className="sm:contents">
         <dt className="text-sm text-muted-foreground">{label}</dt>
         <dd className="mt-3 text-4xl font-normal tracking-[-0.08em] text-foreground">
           {value}
