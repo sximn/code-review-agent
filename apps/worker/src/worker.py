@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import socket
-from typing import Any
+from typing import Any, TypeAlias, cast
 
 import httpx
 from redis.asyncio import Redis
@@ -15,6 +15,10 @@ from .config import AppConfig
 from .pull_request import fetch_pr_metadata, uriEncode
 from .review_state_client import ReviewStateClient
 from .sandbox_client import SandboxClient
+
+StreamMessage: TypeAlias = tuple[str, dict[str, str]]
+StreamBatch: TypeAlias = tuple[str, list[StreamMessage]]
+XReadGroupResponse: TypeAlias = list[StreamBatch]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -368,7 +372,7 @@ async def read_new_jobs(
     state_client: ReviewStateClient,
     github_client: httpx.AsyncClient,
 ) -> None:
-    response = await redis.xreadgroup(
+    raw_response = await redis.xreadgroup(
         groupname=config.group_name,
         consumername=CONSUMER_NAME,
         streams={config.job_stream: ">"},
@@ -376,6 +380,7 @@ async def read_new_jobs(
         block=5000,
     )
 
+    response = cast(XReadGroupResponse | None, raw_response)
     for _, messages in response or []:
         await _process_messages(redis, config, state_client, github_client, messages)
 
