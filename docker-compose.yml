@@ -74,6 +74,10 @@ services:
       context: ./apps/sandbox-controller
       dockerfile: Dockerfile
     restart: unless-stopped
+    # expose the currently selected docker engine
+    use_api_socket: true
+    # avoid runtime-specific socket GID mapping
+    user: "0:0"
     environment:
       SANDBOX_IMAGE: ${SANDBOX_IMAGE}
       SANDBOX_RUNTIME: ${SANDBOX_RUNTIME}
@@ -86,9 +90,6 @@ services:
       SANDBOX_NETWORK: ${SANDBOX_NETWORK}
       SANDBOX_LABEL_PREFIX: ${SANDBOX_LABEL_PREFIX}
       SANDBOX_CONTROLLER_TOKEN: ${SANDBOX_CONTROLLER_TOKEN}
-    volumes:
-      # here this is intentionally the ONLY Docker socket mount
-      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - app
     ports:
