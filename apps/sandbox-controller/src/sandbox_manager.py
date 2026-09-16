@@ -77,7 +77,7 @@ class SandboxManager:
         cwd: str,
         env: dict[str, str] | None,
         timeout_seconds: int,
-    ):
+    ) -> ExecOutput:
         container = self.get(sandbox_id)
 
         wrapped = ["/usr/bin/timeout", "--signal=KILL", f"{timeout_seconds}s", *command]
@@ -93,37 +93,47 @@ class SandboxManager:
 
         stream = self.client.api.exec_start(exec_id, stream=True, demux=True)
 
-        stdout_buffer = []
+        stdout_buffer: list[bytes] = []
+        stderr_buffer: list[bytes] = []
         stdout_current_count = 0
-        stderr_buffer = []
         stderr_current_count = 0
-        truncated = False
+        stdout_truncated = False
+        stderr_truncated = False
         for stdout, stderr in stream:
             if stdout:
                 remaining = MAX_STDOUT_BYTES - stdout_current_count
                 stdout_to_append = stdout[: max(remaining, 0)]
-                stdout_buffer.append(stdout_to_append)
-                stdout_current_count += len(stdout_to_append)
-                truncated: bool = truncated or len(stdout) > remaining
+                if stdout_to_append:
+                    stdout_buffer.append(stdout_to_append)
+                    stdout_current_count += len(stdout_to_append)
+
+                if len(stdout) > remaining:
+                    stdout_truncated = True
+
             if stderr:
                 remaining = MAX_STDERR_BYTES - stderr_current_count
                 stderr_to_append = stderr[: max(remaining, 0)]
-                stderr_buffer.append(stderr_to_append)
-                stderr_current_count += len(stderr_to_append)
-                truncated = truncated or len(stderr) > remaining
+                if stderr_to_append:
+                    stderr_buffer.append(stderr_to_append)
+                    stderr_current_count += len(stderr_to_append)
+
+                if len(stderr) > remaining:
+                    stderr_truncated = True
 
         code = self.client.api.exec_inspect(exec_id)["ExitCode"]
         stdout = b"".join(stdout_buffer).decode("utf-8", errors="replace")
         stderr = b"".join(stderr_buffer).decode("utf-8", errors="replace")
 
-        if truncated:
+        if stdout_truncated:
             stdout += "\n[output truncated]"
+        if stderr_truncated:
+            stderr += "\n[output truncated]"
 
         return ExecOutput(
             exit_code=code,
             stdout=stdout,
             stderr=stderr,
-            truncated=truncated,
+            truncated=stdout_truncated or stderr_truncated,
         )
 
     def destroy(self, sandbox_id: str) -> None:
