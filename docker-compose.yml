@@ -38,8 +38,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-      # dragonfly:
-      #   condition: service_healthy
+      dragonfly:
+        condition: service_healthy
     ports:
       - "127.0.0.1:3000:3000"
     networks:
@@ -68,6 +68,41 @@ services:
         condition: service_healthy
     networks:
       - app
+
+  sandbox-controller:
+    build:
+      context: ./apps/sandbox-controller
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SANDBOX_IMAGE: ${SANDBOX_IMAGE}
+      SANDBOX_RUNTIME: ${SANDBOX_RUNTIME}
+      SANDBOX_MEMORY: ${SANDBOX_MEMORY}
+      SANDBOX_CPUS: ${SANDBOX_CPUS}
+      SANDBOX_PIDS_LIMIT: ${SANDBOX_PIDS_LIMIT}
+      SANDBOX_COMMAND_TIMEOUT_SECONDS: ${SANDBOX_COMMAND_TIMEOUT_SECONDS}
+      SANDBOX_MAX_LIFETIME_SECONDS: ${SANDBOX_MAX_LIFETIME_SECONDS}
+      SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT}
+      SANDBOX_NETWORK: ${SANDBOX_NETWORK}
+      SANDBOX_LABEL_PREFIX: ${SANDBOX_LABEL_PREFIX}
+      SANDBOX_CONTROLLER_TOKEN: ${SANDBOX_CONTROLLER_TOKEN}
+    volumes:
+      # here this is intentionally the ONLY Docker socket mount
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - app
+    ports:
+      - "8000:8000"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2
