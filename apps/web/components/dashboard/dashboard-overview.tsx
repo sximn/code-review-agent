@@ -14,7 +14,7 @@ type DashboardOverviewProps = {
 }
 
 export function DashboardOverview({ overview, userName }: DashboardOverviewProps) {
-  const { metrics } = overview
+  const { metricsThisWeek: metrics } = overview
   const isEmpty = !overview.connectedRepositories || overview.connectedRepositories.length === 0;
   const reduceMotion = useReducedMotion()
   const [configuringRepository, setConfiguringRepository] = React.useState(false)

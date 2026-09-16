@@ -37,7 +37,7 @@ function Metric({
 }
 
 type MetricGridProps = {
-  metrics: DashboardOverview["metrics"]
+  metrics: DashboardOverview["metricsThisWeek"]
   isEmpty: boolean
 }
 
@@ -46,21 +46,21 @@ export function MetricGrid({ metrics, isEmpty }: MetricGridProps) {
     <motion.section
       layout
       className="grid border-y border-border/50 sm:grid-cols-3"
-      aria-label="Review metrics"
+      aria-label="Review metrics this week"
       id="review-metrics"
     >
       <Metric
         label="Reviews this week"
         value={
-          metrics.reviewsThisWeek == null
+          metrics.reviews == null
             ? "—"
-            : String(metrics.reviewsThisWeek)
+            : String(metrics.reviews)
         }
         description={isEmpty ? "Awaiting your first repo" : "Completed reviews"}
         bordered
       />
       <Metric
-        label="Issues caught"
+        label="Issues caught this week"
         value={metrics.issuesCaught == null ? "—" : String(metrics.issuesCaught)}
         description={
           isEmpty ? "Insights will appear here" : "Across reviewed pull requests"
@@ -68,7 +68,7 @@ export function MetricGrid({ metrics, isEmpty }: MetricGridProps) {
         bordered
       />
       <Metric
-        label="Avg. review time"
+        label="Avg. review time this week"
         value={
           metrics.averageReviewTimeMinutes == null
             ? "—"

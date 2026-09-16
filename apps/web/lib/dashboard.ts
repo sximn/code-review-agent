@@ -12,8 +12,8 @@ export type ConnectedRepository = {
 }
 
 export type DashboardOverview = {
-  metrics: {
-    reviewsThisWeek: number
+  metricsThisWeek: {
+    reviews: number
     issuesCaught: number
     averageReviewTimeMinutes: number | null
   }
@@ -31,24 +31,83 @@ export type Review = {
 export async function getDashboardOverview(
   userId: string
 ): Promise<DashboardOverview> {
-  const connectedRepositories = await db
-    .select({
-      id: repository.id,
-      name: repository.fullName,
-      reviewedPullRequests: sql<number>`count(distinct ${review.pullRequestNumber}) filter (where ${review.status} = 'finished')::int`,
-      reviewInProgress: sql<boolean>`coalesce(bool_or(${review.status} in ('scheduled', 'running')), false)`,
-    })
-    .from(repository)
-    .leftJoin(review, eq(review.repositoryId, repository.id))
-    .where(eq(repository.userId, userId))
-    .groupBy(repository.id)
-    .orderBy(desc(repository.createdAt))
+  const [connectedRepositories, [metrics]] = await Promise.all([
+    db
+      .select({
+        id: repository.id,
+        name: repository.fullName,
+        reviewedPullRequests: sql<number>`
+          count(distinct ${review.pullRequestNumber})
+          filter (where ${review.status} = 'finished')::int
+        `,
+        reviewInProgress: sql<boolean>`
+          coalesce(
+            bool_or(${review.status} in ('scheduled', 'running')),
+            false
+          )
+        `,
+      })
+      .from(repository)
+      .leftJoin(review, eq(review.repositoryId, repository.id))
+      .where(eq(repository.userId, userId))
+      .groupBy(repository.id)
+      .orderBy(desc(repository.createdAt)),
+
+    db
+      .select({
+        reviewsThisWeek: sql<number>`
+          count(*)
+          filter (
+            where ${review.status} = 'finished'
+              and ${review.finishedAt} >= date_trunc('week', current_timestamp)
+          )::int
+        `,
+        issuesThisWeek: sql<number>`
+          coalesce(
+            sum(
+              (
+                select count(*)
+                from jsonb_array_elements(
+                  coalesce(${review.result} -> 'findings', '[]'::jsonb)
+                ) as finding
+                where finding ->> 'severity' in ('critical', 'high')
+              )
+            ) filter (
+              where ${review.status} = 'finished'
+                and ${review.result} is not null
+                and ${review.finishedAt} >= date_trunc('week', current_timestamp)
+            ),
+            0
+          )::int
+        `,
+        averageReviewTimeMinutesThisWeek: sql<number | null>`
+          avg(
+            extract(
+              epoch from (${review.finishedAt} - ${review.startedAt})
+            ) / 60.0
+          )
+          filter (
+            where ${review.status} = 'finished'
+              and ${review.startedAt} is not null
+              and ${review.finishedAt} is not null
+              and ${review.finishedAt} >= date_trunc('week', current_timestamp)
+          )::float8
+        `,
+      })
+      .from(review)
+      .innerJoin(repository, eq(review.repositoryId, repository.id))
+      .where(eq(repository.userId, userId)),
+  ])
+
+  const avgMinutesFourDecimal = metrics.averageReviewTimeMinutesThisWeek
+    ? Math.round(metrics.averageReviewTimeMinutesThisWeek * 10000) / 10000
+    : null;
 
   return {
-    metrics: {
-      reviewsThisWeek: 0,
-      issuesCaught: 0,
-      averageReviewTimeMinutes: null
+    metricsThisWeek: {
+      reviews: metrics.reviewsThisWeek,
+      issuesCaught: metrics.issuesThisWeek,
+      averageReviewTimeMinutes: avgMinutesFourDecimal,
     },
     connectedRepositories: connectedRepositories,
   }
