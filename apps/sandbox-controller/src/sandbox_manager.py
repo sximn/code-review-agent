@@ -74,6 +74,8 @@ class SandboxManager:
                 runtime=self.config.sandbox_runtime,
                 command=["sleep", "infinity"],
                 user="1000:1000",
+                cap_drop=["ALL"],
+                security_opt=["no-new-privileges:true"],
                 mem_limit=self.config.sandbox_memory,
                 nano_cpus=int(self.config.sandbox_cpus * 1_000_000_000),
                 pids_limit=self.config.sandbox_pids_limit,
