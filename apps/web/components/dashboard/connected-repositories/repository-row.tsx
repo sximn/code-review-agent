@@ -15,32 +15,22 @@ import {
   LoaderCircle,
   Send,
 } from "lucide-react"
-import { ConnectedRepository } from "@/lib/dashboard"
-import { PullRequest } from "@/lib/repositories"
+import type { ConnectedRepository } from "@/lib/dashboard";
+import type { PullRequest } from "@/lib/repositories";
+import {
+  createReviewResponseSchema,
+  reviewsResponseSchema,
+  type ReviewsResponse,
+} from "@/lib/contracts/review";
 import { Button } from "@/components/ui/button"
+import z from "zod";
 
 const PULL_REQUESTS_PER_PAGE = 25;
 
 type PullRequestsPage = {
-  pullRequests: PullRequest[]
-  nextPage: number | null
-}
-
-type ReviewStatus = "scheduled" | "running" | "failed" | "finished"
-
-type RepositoryReview = {
-  id: string
-  pullRequestNumber: number
-  status: ReviewStatus
-  error: string | null
-  startedAt: string | null
-  finishedAt: string | null
-  createdAt: string
-}
-
-type ReviewsResponse = {
-  reviews: RepositoryReview[]
-}
+  pullRequests: PullRequest[];
+  nextPage: number | null;
+};
 
 async function fetchPullRequests({
   repositoryName,
@@ -80,30 +70,56 @@ async function fetchReviews(
   const params = new URLSearchParams({ repository: repositoryName })
   const response = await fetch(`/api/reviews?${params}`, { signal })
 
+  const body: unknown = await response.json().catch(() => null);
+
   if (!response.ok) {
     throw new Error("Review statuses could not be loaded.")
   }
 
-  return response.json()
+  const parsed = reviewsResponseSchema.safeParse(body)
+
+  if (!parsed.success) {
+    console.error("Invalid reviews API response", parsed.error);
+    throw new Error("The reviews API returned an invalid response.");
+  }
+
+  return parsed.data;
 }
 
 async function createReview(
   repositoryName: string,
   pullRequestNumber: number,
-): Promise<{ review: RepositoryReview }> {
+) {
   const params = new URLSearchParams({
     repository: repositoryName,
     pullRequestNumber: String(pullRequestNumber),
   })
   const response = await fetch(`/api/reviews?${params}`, { method: "POST" })
-  const body = await response.json().catch(() => null)
+
+  const body: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(body?.error ?? "The review could not be started.")
+    const errorResult = z
+      .object({ error: z.string() })
+      .safeParse(body);
+
+    throw new Error(
+      errorResult.success
+        ? errorResult.data.error
+        : "The review could not be started.",
+    );
   }
 
-  return body
+  const parsed = createReviewResponseSchema.safeParse(body);
+
+  if (!parsed.success) {
+    console.error("Invalid create-review API response", parsed.error);
+    throw new Error("The review API returned an invalid response.");
+  }
+
+  return parsed.data;
 }
+
 
 export function RepositoryRow({
   repo,
@@ -119,15 +135,15 @@ export function RepositoryRow({
   const reviewsQuery = useQuery({
     queryKey: ["repository-reviews", repo.id],
     queryFn: ({ signal }) => fetchReviews(repo.name, signal),
-    refetchInterval: (query) => {
-      const data = query.state.data as ReviewsResponse | undefined
-      return data?.reviews.some((review) =>
-        review.status === "scheduled" || review.status === "running"
-      )
-        ? 2000
-        : false
-    },
-  })
+    refetchInterval: (query) =>
+      query.state.data?.reviews.some(
+        (review) =>
+          review.status === "scheduled" ||
+          review.status === "running",
+      ) 
+        ? 2_000
+        : false,
+    });
 
   const createReviewMutation = useMutation({
     mutationFn: (pullRequestNumber: number) =>
