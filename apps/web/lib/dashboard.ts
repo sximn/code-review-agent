@@ -54,24 +54,15 @@ export async function getDashboardOverview(
   }
 }
 
-export type RepositoryReview = {
-  id: string
-  pullRequestNumber: number
-  status: typeof review.$inferSelect.status
-  error: string | null
-  startedAt: Date | null
-  finishedAt: Date | null
-  createdAt: Date
-}
-
 export async function getRepositoryReviews(
   userId: string,
   repositoryName: string,
-): Promise<RepositoryReview[]> {
+) {
   return db
     .select({
       id: review.id,
       pullRequestNumber: review.pullRequestNumber,
+      result: review.result,
       status: review.status,
       error: review.error,
       startedAt: review.startedAt,
@@ -87,8 +78,11 @@ export async function getRepositoryReviews(
       ),
     )
     .orderBy(desc(review.createdAt))
-    .limit(100)
+    .limit(100);
 }
+
+export type RepositoryReview =
+  Awaited<ReturnType<typeof getRepositoryReviews>>[number];
 
 export async function getRecentReviews(userId: string): Promise<Review[]> {
   void userId

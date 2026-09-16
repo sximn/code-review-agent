@@ -1,28 +1,12 @@
 import { timingSafeEqual } from "node:crypto"
 
 import { and, eq, inArray, sql } from "drizzle-orm"
-import { z } from "zod"
 
 import { db } from "@/db/drizzle"
 import { review } from "@/db/schema"
 import env from "@/lib/environment"
+import { reviewStateSchema } from "@/lib/contracts/review";
 
-const reviewStateSchema = z.discriminatedUnion("status", [
-  z.object({
-    reviewId: z.uuid(),
-    status: z.literal("running"),
-  }).strict(),
-  z.object({
-    reviewId: z.uuid(),
-    status: z.literal("finished"),
-    result: z.record(z.string(), z.unknown()),
-  }).strict(),
-  z.object({
-    reviewId: z.uuid(),
-    status: z.literal("failed"),
-    error: z.string().min(1).max(2000),
-  }).strict(),
-])
 
 function hasValidWorkerToken(request: Request): boolean {
   const received = request.headers.get("authorization") ?? ""
@@ -46,7 +30,10 @@ export async function PATCH(request: Request) {
   )
   if (!parsed.success) {
     return Response.json(
-      { error: "Invalid review state payload." },
+      {
+        error: "Invalid review state payload.",
+        issues: parsed.error.issues,
+      },
       { status: 400 },
     )
   }
@@ -98,6 +85,7 @@ export async function PATCH(request: Request) {
     return Response.json({ review: updatedReview })
   }
 
+  // if no row was updated, we check what happened
   const [currentReview] = await db
     .select({ id: review.id, status: review.status })
     .from(review)
@@ -108,8 +96,8 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "Review not found." }, { status: 404 })
   }
 
-  // A repeated callback, or a reclaimed message whose previous worker already
-  // reached a terminal state, is successful and must not overwrite stored data.
+  // callback was called again, or a message was reclaimed after worker already finished
+  // that is valid and can happen, but we cannot override the stored data here
   if (
     currentReview.status === input.status ||
     (input.status === "running" &&

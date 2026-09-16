@@ -10,6 +10,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import type { ReviewResult } from "@/lib/contracts/review";
+
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -118,7 +120,7 @@ export const review = pgTable(
       .references(() => repository.id, { onDelete: "cascade" }),
     pullRequestNumber: integer("pull_request_number").notNull(),
     status: reviewStatusEnum().default("scheduled").notNull(),
-    result: jsonb("result"),
+    result: jsonb("result").$type<ReviewResult>(),
     error: text("error"),
     startedAt: timestamp("started_at"),
     finishedAt: timestamp("finished_at"),
