@@ -381,7 +381,7 @@ async def read_new_jobs(
 
 
 async def run_worker() -> None:
-    config = AppConfig()
+    config = AppConfig()  # pyright: ignore[reportCallIssue]
     redis = Redis.from_url(
         config.redis_url,
         decode_responses=True,
