@@ -2,7 +2,6 @@ import { and, desc, eq, sql } from "drizzle-orm"
 
 import { db } from "@/db/drizzle"
 import { repository, review } from "@/db/schema"
-import { RepositoryReview } from "@/lib/contracts/review"
 
 
 export type ConnectedRepository = {

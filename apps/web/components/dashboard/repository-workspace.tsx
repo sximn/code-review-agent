@@ -115,7 +115,7 @@ function EmptyRepositoryState({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -18, scale: 0.985 }}
       transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-      className={"relative grid min-h-105 place-items-center"/*"absolute inset-0 grid place-items-center"*/}
+      className={"relative grid min-h-105 place-items-center"}
     >
       <motion.div layout="position" className="relative flex max-w-md flex-col items-center p-7.5 text-center">
         <div className="grid size-10 place-items-center rounded-xl border border-border bg-background text-foreground shadow-sm">
@@ -149,7 +149,7 @@ function ConnectedRepositories({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -18, scale: 0.985 }}
       transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-      className={"relative"/*"absolute inset-0 overflow-y-auto"*/}
+      className={"relative"}
     >
       <motion.div
         layout="position"
@@ -180,71 +180,6 @@ function ConnectedRepositories({
             <RepositoryRow key={repo.id} repo={repo} index={index} />
           ))}
         </motion.ul>
-
-        {/* <motion.ul layout className="mt-3 grid gap-3">
-          {repositories.map((repo, index) => {
-            const reviewedPullRequests = 0;// TODO: `repo.reviewedPullRequests ?? 0`
-            const reviewInProgress = false // TODO: `Boolean(repo.reviewInProgress)`
-
-            return (
-              <motion.li
-                key={repo.id}
-                layout
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  delay: index * 0.04,
-                  duration: 0.2,
-                  ease: [0.32, 0.72, 0, 1],
-                }}
-                className="group flex items-center gap-3 rounded-xl border border-border/80 bg-background/75 p-3.5 shadow-sm backdrop-blur-sm transition-colors hover:border-border hover:bg-background"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {repo.name}
-                  </p>
-
-                  <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    {reviewInProgress ? (
-                      <>
-                        <LoaderCircle
-                          aria-hidden="true"
-                          size={13}
-                          className="animate-spin text-blue-600 dark:text-blue-400"
-                        />
-                        <span className="text-blue-600 dark:text-blue-400">
-                          Review in progress
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 aria-hidden="true" size={13} />
-                        <span>Ready for review</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2 border-l border-border pl-3">
-                  <GitPullRequest
-                    aria-hidden="true"
-                    size={16}
-                    className="text-muted-foreground"
-                  />
-
-                  <div className="text-right">
-                    <p className="text-sm font-semibold tabular-nums text-foreground">
-                      {new Intl.NumberFormat().format(reviewedPullRequests)}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      PRs reviewed
-                    </p>
-                  </div>
-                </div>
-              </motion.li>
-            )
-          })}
-        </motion.ul> */}
       </motion.div>
     </motion.div>
   )
