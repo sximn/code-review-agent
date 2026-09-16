@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class CreateSandboxRequest(BaseModel):
-    pass
+    job_id: str
 
 
 class CreateSandboxResponse(BaseModel):
@@ -33,3 +33,8 @@ class ExecCommandResponse(BaseModel):
     """
     whether the output was too long and was truncated before passing to the response
     """
+
+
+class SandboxStatusResponse(BaseModel):
+    id: str
+    status: str
