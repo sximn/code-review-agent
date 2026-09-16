@@ -296,7 +296,7 @@ SANDBOX_TOOL: ChatCompletionFunctionToolParam = {
                     "default": "/workspace/repo",
                 },
             },
-            "required": ["command"],
+            "required": ["command", "cwd"],
             "additionalProperties": False,
         },
     },
