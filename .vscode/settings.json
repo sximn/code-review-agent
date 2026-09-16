@@ -2,7 +2,12 @@
     "python-envs.pythonProjects": [
         {
             "path": "apps/worker",
-            "envManager": "ms-python.python:system",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        },
+        {
+            "path": "apps/sandbox-controller",
+            "envManager": "ms-python.python:venv",
             "packageManager": "ms-python.python:pip"
         }
     ],
@@ -23,7 +28,8 @@
     },
     "python.analysis.inlayHints.variableTypes": true,
     "python.analysis.inlayHints.functionReturnTypes": true,
-    "python.analysis.typeCheckingMode": "off",
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.usePerProjectEnvironments": true,
 
     "workbench.editor.customLabels.patterns": {
         "**/app/**/page.tsx": "${dirname(1)}/${dirname} - page.tsx",
