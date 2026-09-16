@@ -21,6 +21,7 @@ import {
   createReviewResponseSchema,
   reviewsResponseSchema,
   type ReviewsResponse,
+  type RepositoryReview,
 } from "@/lib/contracts/review";
 import { Button } from "@/components/ui/button"
 import z from "zod";
@@ -120,6 +121,228 @@ async function createReview(
   return parsed.data;
 }
 
+
+const severityStyles = {
+  critical:
+    "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
+  high:
+    "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300",
+  medium:
+    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  low:
+    "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+} satisfies Record<
+  NonNullable<RepositoryReview["result"]>["findings"][number]["severity"],
+  string
+>;
+
+function formatLocation(
+  file: string,
+  lineStart: number | null,
+  lineEnd: number | null,
+) {
+  if (lineStart === null) {
+    return file;
+  }
+
+  if (lineEnd !== null && lineEnd !== lineStart) {
+    return `${file}:${lineStart}-${lineEnd}`;
+  }
+
+  return `${file}:${lineStart}`;
+}
+
+function ReviewDetails({
+  review,
+}: {
+  review: RepositoryReview | undefined;
+}) {
+  if (!review) {
+    return null;
+  }
+
+  if (review.status === "scheduled") {
+    return (
+      <div
+        role="status"
+        className="mt-3 flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-700 dark:text-blue-300"
+      >
+        <LoaderCircle
+          aria-hidden="true"
+          size={14}
+          className="animate-spin"
+        />
+        Waiting for a review worker…
+      </div>
+    );
+  }
+
+  if (review.status === "running") {
+    return (
+      <div
+        role="status"
+        className="mt-3 flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-700 dark:text-blue-300"
+      >
+        <LoaderCircle
+          aria-hidden="true"
+          size={14}
+          className="animate-spin"
+        />
+        Reviewing this pull request…
+      </div>
+    );
+  }
+
+  if (review.status === "failed") {
+    return (
+      <div
+        role="alert"
+        className="mt-3 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2.5"
+      >
+        <div className="flex items-center gap-2 text-sm font-medium text-destructive">
+          <CircleX aria-hidden="true" size={15} />
+          Review failed
+        </div>
+
+        <p className="mt-1 whitespace-pre-wrap wrap-break-word text-xs text-muted-foreground">
+          {review.error ?? "The review failed without an error message."}
+        </p>
+      </div>
+    );
+  }
+
+  if (!review.result) {
+    return (
+      <div
+        role="alert"
+        className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300"
+      >
+        The review finished, but no result was returned.
+      </div>
+    );
+  }
+
+  const { approval_granted: approvalGranted, findings } = review.result;
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-lg border border-border bg-background">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/30 px-3 py-2.5">
+        <div
+          className={`flex items-center gap-2 text-sm font-medium ${
+            approvalGranted
+              ? "text-emerald-700 dark:text-emerald-300"
+              : "text-amber-700 dark:text-amber-300"
+          }`}
+        >
+          {approvalGranted ? (
+            <CheckCircle2 aria-hidden="true" size={16} />
+          ) : (
+            <CircleX aria-hidden="true" size={16} />
+          )}
+
+          {approvalGranted ? "Approval granted" : "Changes requested"}
+        </div>
+
+        <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+          {findings.length} {findings.length === 1 ? "finding" : "findings"}
+        </span>
+      </div>
+
+      {findings.length === 0 ? (
+        <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
+          <CheckCircle2
+            aria-hidden="true"
+            size={15}
+            className="text-emerald-600 dark:text-emerald-400"
+          />
+          No issues were found.
+        </div>
+      ) : (
+        <div className="divide-y divide-border">
+          {findings.map((finding, findingIndex) => (
+            <details
+              key={[
+                finding.file,
+                finding.line_start ?? "file",
+                finding.category,
+                finding.title,
+                findingIndex,
+              ].join("-")}
+              className="group"
+            >
+              <summary className="cursor-pointer list-none px-3 py-3 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+                <span className="flex items-start gap-3">
+                  <span
+                    className={`mt-0.5 shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                      severityStyles[finding.severity]
+                    }`}
+                  >
+                    {finding.severity}
+                  </span>
+
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-foreground">
+                      {finding.title}
+                    </span>
+
+                    <span className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">
+                      {formatLocation(
+                        finding.file,
+                        finding.line_start,
+                        finding.line_end,
+                      )}
+                    </span>
+                  </span>
+
+                  <ChevronDown
+                    aria-hidden="true"
+                    size={15}
+                    className="mt-1 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                  />
+                </span>
+              </summary>
+
+              <div className="space-y-3 border-t border-border bg-muted/15 px-3 py-3 text-xs">
+                <div>
+                  <p className="font-medium text-foreground">Description</p>
+                  <p className="mt-1 whitespace-pre-wrap wrap-break-word leading-5 text-muted-foreground">
+                    {finding.description}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-medium text-foreground">Evidence</p>
+                  <pre className="mt-1 overflow-x-auto whitespace-pre-wrap wrap-break-word rounded-md border border-border bg-background p-2 font-mono text-[11px] leading-5 text-muted-foreground">
+                    {finding.evidence}
+                  </pre>
+                </div>
+
+                <div>
+                  <p className="font-medium text-foreground">
+                    Recommendation
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap wrap-break-word leading-5 text-muted-foreground">
+                    {finding.recommendation}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-muted-foreground">
+                  <span className="rounded-full border border-border bg-background px-2 py-0.5 capitalize">
+                    {finding.category}
+                  </span>
+
+                  <span>
+                    {Math.round(finding.confidence * 100)}% confidence
+                  </span>
+                </div>
+              </div>
+            </details>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function RepositoryRow({
   repo,
@@ -316,87 +539,106 @@ export function RepositoryRow({
                 <>
                   <ul className="divide-y divide-border/70">
                     {pullRequests.map((pullRequest) => {
-                      const latestReview = reviews.find(
-                        (review) =>
-                          review.pullRequestNumber === pullRequest.number,
-                      )
-                      const isStarting =
-                        createReviewMutation.isPending &&
-                        createReviewMutation.variables === pullRequest.number
-                      const isActive =
-                        latestReview?.status === "scheduled" ||
-                        latestReview?.status === "running"
+                    // we assume that the API return newest review first
+                    const latestReview = reviews.find(
+                      (review) =>
+                        review.pullRequestNumber === pullRequest.number,
+                    );
 
-                      return <li
+                    const isStarting =
+                      createReviewMutation.isPending &&
+                      createReviewMutation.variables === pullRequest.number;
+
+                    const isActive =
+                      latestReview?.status === "scheduled" ||
+                      latestReview?.status === "running";
+
+                    return (
+                      <li
                         key={`${repo.name}-${pullRequest.number}`}
-                        className="flex justify-between py-1 first:pt-0 last:pb-0"
+                        className="py-3 first:pt-0 last:pb-0"
                       >
-                        <div className="min-w-0">
-                          <a
-                            href={pullRequest.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="group/pr flex min-w-0 items-start gap-3"
-                          >
-                            <GitPullRequest
-                              aria-hidden="true"
-                              size={15}
-                              className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
-                            />
-                            <p className="wrap-break-word text-sm font-medium leading-5 text-foreground group-hover/pr:underline">
-                              {pullRequest.title}
-                            </p>
-                            <ExternalLink
-                              aria-hidden="true"
-                              size={14}
-                              className="mt-1 shrink-0 text-muted-foreground opacity-0 scale-50 group-hover/pr:opacity-100 group-hover/pr:scale-100 transition-[opacity,scale] duration-300"
-                            />
-                          </a>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <a
+                              href={pullRequest.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="group/pr flex min-w-0 items-start gap-3"
+                            >
+                              <GitPullRequest
+                                aria-hidden="true"
+                                size={15}
+                                className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                              />
 
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                            <span>#{pullRequest.number}</span>
+                              <p className="wrap-break-word text-sm font-medium leading-5 text-foreground group-hover/pr:underline">
+                                {pullRequest.title}
+                              </p>
 
-                            <span>
-                              Updated{" "}
-                              {new Intl.DateTimeFormat(undefined, {
-                                dateStyle: "medium",
-                              }).format(new Date(pullRequest.updatedAt))}
-                            </span>
+                              <ExternalLink
+                                aria-hidden="true"
+                                size={14}
+                                className="mt-1 shrink-0 scale-50 text-muted-foreground opacity-0 transition-[opacity,scale] duration-300 group-hover/pr:scale-100 group-hover/pr:opacity-100"
+                              />
+                            </a>
+
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-6.75 text-xs text-muted-foreground">
+                              <span>#{pullRequest.number}</span>
+
+                              <span>
+                                Updated{" "}
+                                {new Intl.DateTimeFormat(undefined, {
+                                  dateStyle: "medium",
+                                }).format(new Date(pullRequest.updatedAt))}
+                              </span>
+                            </div>
                           </div>
+
+                          <Button
+                            size="sm"
+                            className="shrink-0"
+                            disabled={isStarting || isActive}
+                            variant={
+                              latestReview?.status === "failed"
+                                ? "outline"
+                                : "default"
+                            }
+                            onClick={() =>
+                              createReviewMutation.mutate(pullRequest.number)
+                            }
+                          >
+                            {isStarting || isActive ? (
+                              <LoaderCircle
+                                aria-hidden="true"
+                                className="animate-spin"
+                              />
+                            ) : latestReview?.status === "finished" ? (
+                              <CheckCircle2 aria-hidden="true" />
+                            ) : latestReview?.status === "failed" ? (
+                              <CircleX aria-hidden="true" />
+                            ) : (
+                              <Send aria-hidden="true" />
+                            )}
+
+                            {isStarting
+                              ? "Starting"
+                              : latestReview?.status === "scheduled"
+                                ? "Queued"
+                                : latestReview?.status === "running"
+                                  ? "Reviewing"
+                                  : latestReview?.status === "finished"
+                                    ? "Review again"
+                                    : latestReview?.status === "failed"
+                                      ? "Retry"
+                                      : "Review"}
+                          </Button>
                         </div>
 
-                        <Button
-                          size="sm"
-                          className="ml-3"
-                          disabled={isStarting || isActive}
-                          variant={latestReview?.status === "failed" ? "outline" : "default"}
-                          onClick={() =>
-                            createReviewMutation.mutate(pullRequest.number)
-                          }
-                        >
-                          {isStarting || isActive ? (
-                            <LoaderCircle className="animate-spin" />
-                          ) : latestReview?.status === "finished" ? (
-                            <CheckCircle2 />
-                          ) : latestReview?.status === "failed" ? (
-                            <CircleX />
-                          ) : (
-                            <Send />
-                          )}
-                          {isStarting
-                            ? "Starting"
-                            : latestReview?.status === "scheduled"
-                              ? "Queued"
-                              : latestReview?.status === "running"
-                                ? "Reviewing"
-                                : latestReview?.status === "finished"
-                                  ? "Review again"
-                                  : latestReview?.status === "failed"
-                                    ? "Retry"
-                                    : "Review"}
-                        </Button>
+                        <ReviewDetails review={latestReview} />
                       </li>
-                    })}
+                    );
+                  })}
                   </ul>
 
                   {createReviewMutation.isError && (
