@@ -66,12 +66,14 @@ const apiDateSchema = z.iso
 export const repositoryReviewSchema = z
   .object({
     id: z.uuid(),
+    repositoryId: z.uuid(),
     pullRequestNumber: z.number().int(),
     status: reviewStatusSchema,
     result: reviewResultSchema.nullable(),
     error: z.string().nullable(),
     startedAt: apiDateSchema.nullable(),
     finishedAt: apiDateSchema.nullable(),
+    updatedAt: apiDateSchema,
     createdAt: apiDateSchema,
   })
   .strict();

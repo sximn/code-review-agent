@@ -8,6 +8,8 @@ import { enqueueReviewJob } from "@/lib/queue";
 import { checkRepositoryRequest } from "@/lib/repositories"
 import { and, eq } from "drizzle-orm";
 import { getAsPositiveInteger } from "@/lib/nums";
+import z from "zod";
+import { createReviewResponseSchema, reviewsResponseSchema } from "@/lib/contracts/review";
 
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
@@ -26,7 +28,11 @@ export async function GET(request: Request) {
     repoCheck.repository,
   )
 
-  return Response.json({ reviews })
+  const response: z.infer<typeof reviewsResponseSchema> = {
+    reviews,
+  };
+
+  return Response.json(response);
 }
 
 export async function POST(request: Request) {
@@ -106,9 +112,12 @@ export async function POST(request: Request) {
       )
     }
 
-    return Response.json({ review: createdReview }, { status: 201 })
+    const response: z.infer<typeof createReviewResponseSchema> = {
+      review: createdReview,
+    };
+    return Response.json(response, { status: 201 });
   } catch (error) {
-    console.error("Could not create review", error)
+    console.error("Could not create review", error);
     return Response.json(
       { error: "We couldn't create this review. Please try again." },
       { status: 502 },
