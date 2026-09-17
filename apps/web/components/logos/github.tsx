@@ -30,4 +30,6 @@ const GithubLogo = forwardRef<SVGSVGElement, GithubLogoProps>(
   },
 );
 
+GithubLogo.displayName = "GithubLogoIcon";
+
 export default GithubLogo;
