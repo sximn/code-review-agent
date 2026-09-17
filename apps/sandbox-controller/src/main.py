@@ -1,8 +1,10 @@
 import asyncio
 import logging
+from functools import lru_cache
+from typing import Annotated
 
 from docker.errors import DockerException
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 
 from .config import SandboxConfig
 from .sandbox_manager import SandboxManager
@@ -16,15 +18,26 @@ from .schemas import (
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
-config = SandboxConfig()  # pyright: ignore[reportCallIssue]
-manager = SandboxManager(config=config)
+
+
+@lru_cache
+def get_config():
+    return SandboxConfig()  # pyright: ignore[reportCallIssue]
+
+
+ConfigDependency = Annotated[SandboxConfig, Depends(get_config)]
+
+manager = SandboxManager(config=get_config())
 
 
 def require_token(
+    config: ConfigDependency,
     x_sandbox_controller_token: str | None = Header(default=None),
 ) -> None:
     if x_sandbox_controller_token != config.sandbox_controller_token:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+        )
 
 
 app = FastAPI()
@@ -56,7 +69,10 @@ async def create_sandbox(
 
 @app.post("/sandboxes/{sandbox_id}/exec")
 async def execute_command(
-    sandbox_id: str, request: ExecCommandRequest, _: None = Depends(require_token)
+    sandbox_id: str,
+    request: ExecCommandRequest,
+    config: ConfigDependency,
+    _: None = Depends(require_token),
 ) -> ExecCommandResponse:
     try:
         timeout = min(
