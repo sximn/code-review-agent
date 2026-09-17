@@ -56,6 +56,9 @@ function DitheredWaveBg() {
       <Image
         alt="Dithered wave"
         aria-hidden="true"
+        width={800}
+        height={500}
+        loading="eager"
         className="aspect-video size-full rounded-2xl border-2 border-border bg-no-repeat object-cover brightness-95 dark:brightness-85"
         src="/dithered-wave.png"
       />
