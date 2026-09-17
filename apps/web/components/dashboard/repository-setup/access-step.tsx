@@ -1,18 +1,18 @@
-import { ArrowLeft, ArrowRight, Check } from "lucide-react"
-import { motion } from "motion/react"
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { motion } from "motion/react";
 
-import GithubLogo from "@/components/logos/github"
-import { Button } from "@/components/ui/button"
+import GithubLogo from "@/components/logos/github";
+import { Button } from "@/components/ui/button";
 
-import { STEP_TRANSITION, STEP_VARIANTS } from "./step-motion"
-import type { WizardDirection } from "./types"
+import { STEP_TRANSITION, STEP_VARIANTS } from "./step-motion";
+import type { WizardDirection } from "./types";
 
 type AccessStepProps = {
-  repository: string
-  onBack: () => void
-  onContinue: () => void
-  direction: WizardDirection
-}
+  repository: string;
+  onBack: () => void;
+  onContinue: () => void;
+  direction: WizardDirection;
+};
 
 export function AccessStep({
   repository,
@@ -45,7 +45,8 @@ export function AccessStep({
           <div className="min-w-0">
             <p className="font-medium text-foreground">{repository}</p>
             <p className="mt-1 text-sm leading-5 text-muted-foreground">
-              This public repository was verified with GitHub. Private repository support is not available yet.
+              This public repository was verified with GitHub. Private
+              repository support is not available yet.
             </p>
           </div>
         </div>
@@ -58,7 +59,12 @@ export function AccessStep({
       </div>
 
       <div className="mt-8 flex items-center justify-between gap-3">
-        <Button type="button" variant="ghost" onClick={onBack} className="gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onBack}
+          className="gap-2"
+        >
           <ArrowLeft aria-hidden="true" size={16} />
           Back
         </Button>
@@ -68,7 +74,7 @@ export function AccessStep({
         </Button>
       </div>
     </motion.div>
-  )
+  );
 }
 
 function AccessPermission({ label }: { label: string }) {
@@ -79,5 +85,5 @@ function AccessPermission({ label }: { label: string }) {
       </span>
       <span className="text-foreground/85">{label}</span>
     </div>
-  )
+  );
 }

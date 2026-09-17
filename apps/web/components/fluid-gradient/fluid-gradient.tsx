@@ -106,7 +106,11 @@ function createShader(gl: WebGLRenderingContext, type: number, source: string) {
   return shader;
 }
 
-export function FluidGradient({ className = "", intensity = 1, lineCount = 42 }: FluidGradientProps) {
+export function FluidGradient({
+  className = "",
+  intensity = 1,
+  lineCount = 42,
+}: FluidGradientProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -127,7 +131,11 @@ export function FluidGradient({ className = "", intensity = 1, lineCount = 42 }:
 
     const buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+      gl.STATIC_DRAW,
+    );
     gl.useProgram(program);
     const position = gl.getAttribLocation(program, "a_position");
     gl.enableVertexAttribArray(position);
@@ -138,7 +146,9 @@ export function FluidGradient({ className = "", intensity = 1, lineCount = 42 }:
     const pointer = gl.getUniformLocation(program, "u_pointer");
     const amount = gl.getUniformLocation(program, "u_intensity");
     const lines = gl.getUniformLocation(program, "u_lineCount");
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     let frame = 0;
     let started = performance.now();
     let pointerX = 0.55;
@@ -168,7 +178,13 @@ export function FluidGradient({ className = "", intensity = 1, lineCount = 42 }:
       gl.uniform1f(time, elapsed);
       gl.uniform2f(pointer, pointerX, pointerY);
       gl.uniform1f(amount, Math.max(0, intensity));
-      gl.uniform1f(lines, Math.max(12, lineCount * Math.min(canvas.width / Math.max(canvas.height, 1), 1.25)));
+      gl.uniform1f(
+        lines,
+        Math.max(
+          12,
+          lineCount * Math.min(canvas.width / Math.max(canvas.height, 1), 1.25),
+        ),
+      );
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       frame = reducedMotion ? 0 : requestAnimationFrame(render);
     };

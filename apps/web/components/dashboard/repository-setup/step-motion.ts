@@ -1,9 +1,9 @@
-import type { WizardDirection } from "./types"
+import type { WizardDirection } from "./types";
 
 export const STEP_TRANSITION = {
   duration: 0.28,
   ease: [0.32, 0.72, 0, 1],
-} as const
+} as const;
 
 export const STEP_VARIANTS = {
   enter: (direction: WizardDirection) => ({
@@ -18,4 +18,4 @@ export const STEP_VARIANTS = {
     opacity: 0,
     x: direction * -40,
   }),
-}
+};

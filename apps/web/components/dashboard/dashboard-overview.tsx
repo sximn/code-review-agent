@@ -1,34 +1,40 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { MotionConfig, useReducedMotion } from "motion/react"
+import * as React from "react";
+import { MotionConfig, useReducedMotion } from "motion/react";
 
-import { DashboardHeader } from "@/components/dashboard/dashboard-header"
-import { MetricGrid } from "@/components/dashboard/metric-grid"
-import { RepositoryWorkspace } from "@/components/dashboard/repository-workspace"
-import type { DashboardOverview as DashboardOverviewType } from "@/lib/dashboard"
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { MetricGrid } from "@/components/dashboard/metric-grid";
+import { RepositoryWorkspace } from "@/components/dashboard/repository-workspace";
+import type { DashboardOverview as DashboardOverviewType } from "@/lib/dashboard";
 
 type DashboardOverviewProps = {
-  overview: DashboardOverviewType
-  userName: string
-}
+  overview: DashboardOverviewType;
+  userName: string;
+};
 
-export function DashboardOverview({ overview, userName }: DashboardOverviewProps) {
-  const { metricsThisWeek: metrics } = overview
-  const isEmpty = !overview.connectedRepositories || overview.connectedRepositories.length === 0;
-  const reduceMotion = useReducedMotion()
-  const [configuringRepository, setConfiguringRepository] = React.useState(false)
-  const [repository, setRepository] = React.useState("")
+export function DashboardOverview({
+  overview,
+  userName,
+}: DashboardOverviewProps) {
+  const { metricsThisWeek: metrics } = overview;
+  const isEmpty =
+    !overview.connectedRepositories ||
+    overview.connectedRepositories.length === 0;
+  const reduceMotion = useReducedMotion();
+  const [configuringRepository, setConfiguringRepository] =
+    React.useState(false);
+  const [repository, setRepository] = React.useState("");
 
   function openRepositorySetup() {
-    setConfiguringRepository(true)
+    setConfiguringRepository(true);
 
     requestAnimationFrame(() => {
       document.getElementById("repository-setup")?.scrollIntoView({
         behavior: reduceMotion ? "auto" : "smooth",
         block: "start",
-      })
-    })
+      });
+    });
   }
 
   function closeRepositorySetup() {
@@ -36,16 +42,16 @@ export function DashboardOverview({ overview, userName }: DashboardOverviewProps
       document.getElementById("review-metrics")?.scrollIntoView({
         behavior: reduceMotion ? "auto" : "smooth",
         block: "center",
-      })
-    })
+      });
+    });
 
-    setConfiguringRepository(false)
-    setRepository("")
+    setConfiguringRepository(false);
+    setRepository("");
   }
 
   function completeRepositorySetup() {
-    setConfiguringRepository(false)
-    setRepository("")
+    setConfiguringRepository(false);
+    setRepository("");
   }
 
   return (
@@ -57,9 +63,7 @@ export function DashboardOverview({ overview, userName }: DashboardOverviewProps
           : { type: "spring", stiffness: 320, damping: 34, mass: 0.9 },
       }}
     >
-      <main
-        className="flex flex-1 flex-col bg-[radial-gradient(circle_at_28%_18%,rgba(234,247,255,0.7),transparent_28rem),radial-gradient(circle_at_88%_85%,rgba(232,227,255,0.45),transparent_22rem)] dark:bg-[radial-gradient(circle_at_28%_18%,rgba(11,18,32,0.6),transparent_28rem),radial-gradient(circle_at_88%_85%,rgba(18,17,42,0.45),transparent_22rem)]"
-      >
+      <main className="flex flex-1 flex-col bg-[radial-gradient(circle_at_28%_18%,rgba(234,247,255,0.7),transparent_28rem),radial-gradient(circle_at_88%_85%,rgba(232,227,255,0.45),transparent_22rem)] dark:bg-[radial-gradient(circle_at_28%_18%,rgba(11,18,32,0.6),transparent_28rem),radial-gradient(circle_at_88%_85%,rgba(18,17,42,0.45),transparent_22rem)]">
         <div className="mx-auto w-full max-w-6xl px-5 py-2 sm:px-8 sm:py-4">
           <DashboardHeader
             isEmpty={isEmpty}
@@ -80,5 +84,5 @@ export function DashboardOverview({ overview, userName }: DashboardOverviewProps
         </div>
       </main>
     </MotionConfig>
-  )
+  );
 }

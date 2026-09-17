@@ -1,11 +1,11 @@
-import { useState } from "react"
+import { useState } from "react";
 import {
   useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
-} from "@tanstack/react-query"
-import { AnimatePresence, motion } from "motion/react"
+} from "@tanstack/react-query";
+import { AnimatePresence, motion } from "motion/react";
 import {
   CheckCircle2,
   ChevronDown,
@@ -14,7 +14,7 @@ import {
   GitPullRequest,
   LoaderCircle,
   Send,
-} from "lucide-react"
+} from "lucide-react";
 import type { ConnectedRepository } from "@/lib/dashboard";
 import type { PullRequest } from "@/lib/repositories";
 import {
@@ -23,7 +23,7 @@ import {
   type ReviewsResponse,
   type RepositoryReview,
 } from "@/lib/contracts/review";
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import z from "zod";
 
 const PULL_REQUESTS_PER_PAGE = 25;
@@ -38,46 +38,45 @@ async function fetchPullRequests({
   page,
   signal,
 }: {
-  repositoryName: string
-  page: number
-  signal?: AbortSignal
+  repositoryName: string;
+  page: number;
+  signal?: AbortSignal;
 }): Promise<PullRequestsPage> {
   const params = new URLSearchParams({
     repository: repositoryName,
     page: String(page),
     perPage: String(PULL_REQUESTS_PER_PAGE),
-  })
+  });
 
-  const response = await fetch(
-    `/api/repositories/pull-requests?${params}`,
-    { signal },
-  )
+  const response = await fetch(`/api/repositories/pull-requests?${params}`, {
+    signal,
+  });
 
   if (!response.ok) {
-    const body = await response.json().catch(() => null)
+    const body = await response.json().catch(() => null);
 
     throw new Error(
       body?.error ?? "We couldn't load pull requests. Please try again.",
-    )
+    );
   }
 
-  return response.json()
+  return response.json();
 }
 
 async function fetchReviews(
   repositoryName: string,
   signal?: AbortSignal,
 ): Promise<ReviewsResponse> {
-  const params = new URLSearchParams({ repository: repositoryName })
-  const response = await fetch(`/api/reviews?${params}`, { signal })
+  const params = new URLSearchParams({ repository: repositoryName });
+  const response = await fetch(`/api/reviews?${params}`, { signal });
 
   const body: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error("Review statuses could not be loaded.")
+    throw new Error("Review statuses could not be loaded.");
   }
 
-  const parsed = reviewsResponseSchema.safeParse(body)
+  const parsed = reviewsResponseSchema.safeParse(body);
 
   if (!parsed.success) {
     console.error("Invalid reviews API response", parsed.error);
@@ -87,22 +86,17 @@ async function fetchReviews(
   return parsed.data;
 }
 
-async function createReview(
-  repositoryName: string,
-  pullRequestNumber: number,
-) {
+async function createReview(repositoryName: string, pullRequestNumber: number) {
   const params = new URLSearchParams({
     repository: repositoryName,
     pullRequestNumber: String(pullRequestNumber),
-  })
-  const response = await fetch(`/api/reviews?${params}`, { method: "POST" })
+  });
+  const response = await fetch(`/api/reviews?${params}`, { method: "POST" });
 
   const body: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const errorResult = z
-      .object({ error: z.string() })
-      .safeParse(body);
+    const errorResult = z.object({ error: z.string() }).safeParse(body);
 
     throw new Error(
       errorResult.success
@@ -121,16 +115,12 @@ async function createReview(
   return parsed.data;
 }
 
-
 const severityStyles = {
-  critical:
-    "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
-  high:
-    "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300",
+  critical: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
+  high: "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300",
   medium:
     "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  low:
-    "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  low: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
 } satisfies Record<
   NonNullable<RepositoryReview["result"]>["findings"][number]["severity"],
   string
@@ -152,11 +142,7 @@ function formatLocation(
   return `${file}:${lineStart}`;
 }
 
-function ReviewDetails({
-  review,
-}: {
-  review: RepositoryReview | undefined;
-}) {
+function ReviewDetails({ review }: { review: RepositoryReview | undefined }) {
   if (!review) {
     return null;
   }
@@ -167,11 +153,7 @@ function ReviewDetails({
         role="status"
         className="mt-3 flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-700 dark:text-blue-300"
       >
-        <LoaderCircle
-          aria-hidden="true"
-          size={14}
-          className="animate-spin"
-        />
+        <LoaderCircle aria-hidden="true" size={14} className="animate-spin" />
         Waiting for a review worker…
       </div>
     );
@@ -183,11 +165,7 @@ function ReviewDetails({
         role="status"
         className="mt-3 flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-700 dark:text-blue-300"
       >
-        <LoaderCircle
-          aria-hidden="true"
-          size={14}
-          className="animate-spin"
-        />
+        <LoaderCircle aria-hidden="true" size={14} className="animate-spin" />
         Reviewing this pull request…
       </div>
     );
@@ -204,7 +182,7 @@ function ReviewDetails({
           Review failed
         </div>
 
-        <p className="mt-1 whitespace-pre-wrap wrap-break-word text-xs text-muted-foreground">
+        <p className="mt-1 text-xs wrap-break-word whitespace-pre-wrap text-muted-foreground">
           {review.error ?? "The review failed without an error message."}
         </p>
       </div>
@@ -273,7 +251,7 @@ function ReviewDetails({
               <summary className="cursor-pointer list-none px-3 py-3 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
                 <span className="flex items-start gap-3">
                   <span
-                    className={`mt-0.5 shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                    className={`mt-0.5 shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
                       severityStyles[finding.severity]
                     }`}
                   >
@@ -305,23 +283,21 @@ function ReviewDetails({
               <div className="space-y-3 border-t border-border bg-muted/15 px-3 py-3 text-xs">
                 <div>
                   <p className="font-medium text-foreground">Description</p>
-                  <p className="mt-1 whitespace-pre-wrap wrap-break-word leading-5 text-muted-foreground">
+                  <p className="mt-1 leading-5 wrap-break-word whitespace-pre-wrap text-muted-foreground">
                     {finding.description}
                   </p>
                 </div>
 
                 <div>
                   <p className="font-medium text-foreground">Evidence</p>
-                  <pre className="mt-1 overflow-x-auto whitespace-pre-wrap wrap-break-word rounded-md border border-border bg-background p-2 font-mono text-[11px] leading-5 text-muted-foreground">
+                  <pre className="mt-1 overflow-x-auto rounded-md border border-border bg-background p-2 font-mono text-[11px] leading-5 wrap-break-word whitespace-pre-wrap text-muted-foreground">
                     {finding.evidence}
                   </pre>
                 </div>
 
                 <div>
-                  <p className="font-medium text-foreground">
-                    Recommendation
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap wrap-break-word leading-5 text-muted-foreground">
+                  <p className="font-medium text-foreground">Recommendation</p>
+                  <p className="mt-1 leading-5 wrap-break-word whitespace-pre-wrap text-muted-foreground">
                     {finding.recommendation}
                   </p>
                 </div>
@@ -348,11 +324,11 @@ export function RepositoryRow({
   repo,
   index,
 }: {
-  repo: ConnectedRepository
-  index: number
+  repo: ConnectedRepository;
+  index: number;
 }) {
-  const [expanded, setExpanded] = useState(false)
-  const queryClient = useQueryClient()
+  const [expanded, setExpanded] = useState(false);
+  const queryClient = useQueryClient();
   const panelId = `repository-${repo.id}-pull-requests`;
 
   const reviewsQuery = useQuery({
@@ -361,12 +337,11 @@ export function RepositoryRow({
     refetchInterval: (query) =>
       query.state.data?.reviews.some(
         (review) =>
-          review.status === "scheduled" ||
-          review.status === "running",
-      ) 
+          review.status === "scheduled" || review.status === "running",
+      )
         ? 2_000
         : false,
-    });
+  });
 
   const createReviewMutation = useMutation({
     mutationFn: (pullRequestNumber: number) =>
@@ -382,9 +357,9 @@ export function RepositoryRow({
             ) ?? []),
           ],
         }),
-      )
+      );
     },
-  })
+  });
 
   const pullRequestsQuery = useInfiniteQuery({
     queryKey: ["repository-pull-requests", repo.id],
@@ -401,17 +376,18 @@ export function RepositoryRow({
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-  })
+  });
 
   const pullRequests =
-    pullRequestsQuery.data?.pages.flatMap((page) => page.pullRequests) ?? []
-  const reviews = reviewsQuery.data?.reviews ?? []
+    pullRequestsQuery.data?.pages.flatMap((page) => page.pullRequests) ?? [];
+  const reviews = reviewsQuery.data?.reviews ?? [];
   const reviewInProgress = reviewsQuery.data
     ? reviews.some(
-        (review) => review.status === "scheduled" || review.status === "running",
+        (review) =>
+          review.status === "scheduled" || review.status === "running",
       )
-    : repo.reviewInProgress
-  const reviewedPullRequests = repo.reviewedPullRequests
+    : repo.reviewInProgress;
+  const reviewedPullRequests = repo.reviewedPullRequests;
 
   return (
     <motion.li
@@ -432,7 +408,7 @@ export function RepositoryRow({
           aria-controls={panelId}
           aria-label={`${expanded ? "Hide" : "Show"} pull requests for ${repo.name}`}
           onClick={() => setExpanded((value) => !value)}
-          className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <ChevronDown
             aria-hidden="true"
@@ -477,7 +453,7 @@ export function RepositoryRow({
           />
 
           <div className="text-right">
-            <p className="text-sm font-semibold tabular-nums text-foreground">
+            <p className="text-sm font-semibold text-foreground tabular-nums">
               {new Intl.NumberFormat().format(reviewedPullRequests)}
             </p>
             <p className="hidden text-[11px] text-muted-foreground sm:block">
@@ -539,106 +515,106 @@ export function RepositoryRow({
                 <>
                   <ul className="divide-y divide-border/70">
                     {pullRequests.map((pullRequest) => {
-                    // we assume that the API return newest review first
-                    const latestReview = reviews.find(
-                      (review) =>
-                        review.pullRequestNumber === pullRequest.number,
-                    );
+                      // we assume that the API return newest review first
+                      const latestReview = reviews.find(
+                        (review) =>
+                          review.pullRequestNumber === pullRequest.number,
+                      );
 
-                    const isStarting =
-                      createReviewMutation.isPending &&
-                      createReviewMutation.variables === pullRequest.number;
+                      const isStarting =
+                        createReviewMutation.isPending &&
+                        createReviewMutation.variables === pullRequest.number;
 
-                    const isActive =
-                      latestReview?.status === "scheduled" ||
-                      latestReview?.status === "running";
+                      const isActive =
+                        latestReview?.status === "scheduled" ||
+                        latestReview?.status === "running";
 
-                    return (
-                      <li
-                        key={`${repo.name}-${pullRequest.number}`}
-                        className="py-3 first:pt-0 last:pb-0"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <a
-                              href={pullRequest.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="group/pr flex min-w-0 items-start gap-3"
-                            >
-                              <GitPullRequest
-                                aria-hidden="true"
-                                size={15}
-                                className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
-                              />
+                      return (
+                        <li
+                          key={`${repo.name}-${pullRequest.number}`}
+                          className="py-3 first:pt-0 last:pb-0"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <a
+                                href={pullRequest.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="group/pr flex min-w-0 items-start gap-3"
+                              >
+                                <GitPullRequest
+                                  aria-hidden="true"
+                                  size={15}
+                                  className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                                />
 
-                              <p className="wrap-break-word text-sm font-medium leading-5 text-foreground group-hover/pr:underline">
-                                {pullRequest.title}
-                              </p>
+                                <p className="text-sm leading-5 font-medium wrap-break-word text-foreground group-hover/pr:underline">
+                                  {pullRequest.title}
+                                </p>
 
-                              <ExternalLink
-                                aria-hidden="true"
-                                size={14}
-                                className="mt-1 shrink-0 scale-50 text-muted-foreground opacity-0 transition-[opacity,scale] duration-300 group-hover/pr:scale-100 group-hover/pr:opacity-100"
-                              />
-                            </a>
+                                <ExternalLink
+                                  aria-hidden="true"
+                                  size={14}
+                                  className="mt-1 shrink-0 scale-50 text-muted-foreground opacity-0 transition-[opacity,scale] duration-300 group-hover/pr:scale-100 group-hover/pr:opacity-100"
+                                />
+                              </a>
 
-                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-6.75 text-xs text-muted-foreground">
-                              <span>#{pullRequest.number}</span>
+                              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-6.75 text-xs text-muted-foreground">
+                                <span>#{pullRequest.number}</span>
 
-                              <span>
-                                Updated{" "}
-                                {new Intl.DateTimeFormat(undefined, {
-                                  dateStyle: "medium",
-                                }).format(new Date(pullRequest.updatedAt))}
-                              </span>
+                                <span>
+                                  Updated{" "}
+                                  {new Intl.DateTimeFormat(undefined, {
+                                    dateStyle: "medium",
+                                  }).format(new Date(pullRequest.updatedAt))}
+                                </span>
+                              </div>
                             </div>
+
+                            <Button
+                              size="sm"
+                              className="shrink-0"
+                              disabled={isStarting || isActive}
+                              variant={
+                                latestReview?.status === "failed"
+                                  ? "outline"
+                                  : "default"
+                              }
+                              onClick={() =>
+                                createReviewMutation.mutate(pullRequest.number)
+                              }
+                            >
+                              {isStarting || isActive ? (
+                                <LoaderCircle
+                                  aria-hidden="true"
+                                  className="animate-spin"
+                                />
+                              ) : latestReview?.status === "finished" ? (
+                                <CheckCircle2 aria-hidden="true" />
+                              ) : latestReview?.status === "failed" ? (
+                                <CircleX aria-hidden="true" />
+                              ) : (
+                                <Send aria-hidden="true" />
+                              )}
+
+                              {isStarting
+                                ? "Starting"
+                                : latestReview?.status === "scheduled"
+                                  ? "Queued"
+                                  : latestReview?.status === "running"
+                                    ? "Reviewing"
+                                    : latestReview?.status === "finished"
+                                      ? "Review again"
+                                      : latestReview?.status === "failed"
+                                        ? "Retry"
+                                        : "Review"}
+                            </Button>
                           </div>
 
-                          <Button
-                            size="sm"
-                            className="shrink-0"
-                            disabled={isStarting || isActive}
-                            variant={
-                              latestReview?.status === "failed"
-                                ? "outline"
-                                : "default"
-                            }
-                            onClick={() =>
-                              createReviewMutation.mutate(pullRequest.number)
-                            }
-                          >
-                            {isStarting || isActive ? (
-                              <LoaderCircle
-                                aria-hidden="true"
-                                className="animate-spin"
-                              />
-                            ) : latestReview?.status === "finished" ? (
-                              <CheckCircle2 aria-hidden="true" />
-                            ) : latestReview?.status === "failed" ? (
-                              <CircleX aria-hidden="true" />
-                            ) : (
-                              <Send aria-hidden="true" />
-                            )}
-
-                            {isStarting
-                              ? "Starting"
-                              : latestReview?.status === "scheduled"
-                                ? "Queued"
-                                : latestReview?.status === "running"
-                                  ? "Reviewing"
-                                  : latestReview?.status === "finished"
-                                    ? "Review again"
-                                    : latestReview?.status === "failed"
-                                      ? "Retry"
-                                      : "Review"}
-                          </Button>
-                        </div>
-
-                        <ReviewDetails review={latestReview} />
-                      </li>
-                    );
-                  })}
+                          <ReviewDetails review={latestReview} />
+                        </li>
+                      );
+                    })}
                   </ul>
 
                   {createReviewMutation.isError && (
@@ -677,5 +653,5 @@ export function RepositoryRow({
         )}
       </AnimatePresence>
     </motion.li>
-  )
+  );
 }

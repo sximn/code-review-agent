@@ -1,6 +1,6 @@
-import { cn } from "cn"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Loading03Icon } from "@hugeicons/core-free-icons"
+import { cn } from "cn";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Loading03Icon } from "@hugeicons/core-free-icons";
 
 function Spinner({
   className,
@@ -8,7 +8,7 @@ function Spinner({
   ...props
 }: React.ComponentProps<"svg">) {
   const iconStrokeWidth =
-    typeof strokeWidth === "number" ? strokeWidth : Number(strokeWidth) || 2
+    typeof strokeWidth === "number" ? strokeWidth : Number(strokeWidth) || 2;
 
   return (
     <HugeiconsIcon
@@ -20,7 +20,7 @@ function Spinner({
       className={cn("size-4 animate-spin", className)}
       {...props}
     />
-  )
+  );
 }
 
-export { Spinner }
+export { Spinner };

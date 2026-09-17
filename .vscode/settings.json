@@ -1,47 +1,69 @@
 {
-    "python-envs.pythonProjects": [
-        {
-            "path": "apps/worker",
-            "envManager": "ms-python.python:venv",
-            "packageManager": "ms-python.python:pip"
-        },
-        {
-            "path": "apps/sandbox-controller",
-            "envManager": "ms-python.python:venv",
-            "packageManager": "ms-python.python:pip"
-        }
-    ],
-    "ruff.configurationPreference": "filesystemFirst",
-
-    "[python]": {
-        "editor.defaultFormatter": "charliermarsh.ruff",
-        "diffEditor.ignoreTrimWhitespace": true,
-        "gitlens.codeLens.symbolScopes": [
-            "!Module"
-        ],
-        "editor.formatOnSave": true,
-        "editor.wordBasedSuggestions": "off",
-        "editor.codeActionsOnSave": {
-            "source.fixAll": "explicit",
-            "source.organizeImports.ruff": "always"
-        },
+  "python-envs.pythonProjects": [
+    {
+      "path": "apps/worker",
+      "envManager": "ms-python.python:venv",
+      "packageManager": "ms-python.python:pip"
     },
-    "python.analysis.inlayHints.variableTypes": true,
-    "python.analysis.inlayHints.functionReturnTypes": true,
-    "python.analysis.typeCheckingMode": "basic",
-    "python.analysis.usePerProjectEnvironments": true,
-
-    "workbench.editor.customLabels.patterns": {
-        "**/app/**/page.tsx": "${dirname(1)}/${dirname} - page.tsx",
-        "**/app/**/layout.tsx": "${dirname(1)}/${dirname} - layout.tsx",
-        "**/app/**/loading.tsx": "${dirname(1)}/${dirname} - loading.tsx",
-        "**/app/**/error.tsx": "${dirname(1)}/${dirname} - error.tsx",
-        "**/app/**/not-found.tsx": "${dirname(1)}/${dirname} - not-found.tsx",
-        "**/app/**/template.tsx": "${dirname(1)}/${dirname} - template.tsx",
-        "**/app/**/default.tsx": "${dirname(1)}/${dirname} - default.tsx",
-        "**/app/**/route.ts": "${dirname(1)}/${dirname} - route.ts"
-    },
-    "[javascript][javascriptreact][typescript][typescriptreact]": {
-        "editor.tabSize": 2,
+    {
+      "path": "apps/sandbox-controller",
+      "envManager": "ms-python.python:venv",
+      "packageManager": "ms-python.python:pip"
     }
+  ],
+  "ruff.configurationPreference": "filesystemFirst",
+
+  "eslint.workingDirectories": [
+    {
+      "directory": "apps/web",
+      "changeProcessCWD": true
+    }
+  ],
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "prettier.requireConfig": true,
+  "prettier.prettierPath": "./apps/web/node_modules/prettier",
+
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "diffEditor.ignoreTrimWhitespace": true,
+    "gitlens.codeLens.symbolScopes": ["!Module"],
+    "editor.formatOnSave": true,
+    "editor.wordBasedSuggestions": "off",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports.ruff": "always"
+    }
+  },
+  "python.analysis.inlayHints.variableTypes": true,
+  "python.analysis.inlayHints.functionReturnTypes": true,
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.usePerProjectEnvironments": true,
+
+  "workbench.editor.customLabels.patterns": {
+    "**/app/**/page.tsx": "${dirname(1)}/${dirname} - page.tsx",
+    "**/app/**/layout.tsx": "${dirname(1)}/${dirname} - layout.tsx",
+    "**/app/**/loading.tsx": "${dirname(1)}/${dirname} - loading.tsx",
+    "**/app/**/error.tsx": "${dirname(1)}/${dirname} - error.tsx",
+    "**/app/**/not-found.tsx": "${dirname(1)}/${dirname} - not-found.tsx",
+    "**/app/**/template.tsx": "${dirname(1)}/${dirname} - template.tsx",
+    "**/app/**/default.tsx": "${dirname(1)}/${dirname} - default.tsx",
+    "**/app/**/route.ts": "${dirname(1)}/${dirname} - route.ts"
+  },
+  "[javascript][javascriptreact][typescript][typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[css][json][jsonc][markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  }
 }

@@ -1,30 +1,30 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { useRouter } from "next/navigation"
-import { AnimatePresence, motion } from "motion/react"
-import { toast } from "sonner"
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
+import { toast } from "sonner";
 
-import { isRepositoryName, normalizeRepository } from "@/lib/repository-name"
+import { isRepositoryName, normalizeRepository } from "@/lib/repository-name";
 
-import { AccessStep } from "./access-step"
-import { ConfigurationStep } from "./configuration-step"
-import { RepositoryStep } from "./repository-step"
+import { AccessStep } from "./access-step";
+import { ConfigurationStep } from "./configuration-step";
+import { RepositoryStep } from "./repository-step";
 import type {
   RepositoryCheckResult,
   RepositoryCheckStatus,
   RepositorySaveResult,
   RepositorySetupStep,
   WizardDirection,
-} from "./types"
-import { WizardHeader } from "./wizard-header"
+} from "./types";
+import { WizardHeader } from "./wizard-header";
 
 type RepositorySetupWizardProps = {
-  repository: string
-  setRepository: (repository: string) => void
-  onClose: () => void
-  onComplete: () => void
-}
+  repository: string;
+  setRepository: (repository: string) => void;
+  onClose: () => void;
+  onComplete: () => void;
+};
 
 export function RepositorySetupWizard({
   repository,
@@ -32,73 +32,79 @@ export function RepositorySetupWizard({
   onClose,
   onComplete,
 }: RepositorySetupWizardProps) {
-  const router = useRouter()
-  const [step, setStep] = React.useState<RepositorySetupStep>(0)
-  const [direction, setDirection] = React.useState<WizardDirection>(1)
-  const [checkStatus, setCheckStatus] = React.useState<RepositoryCheckStatus>("idle")
-  const [checkError, setCheckError] = React.useState<string | null>(null)
-  const [isSaving, setIsSaving] = React.useState(false)
-  const [saveError, setSaveError] = React.useState<string | null>(null)
-  const repositoryInputRef = React.useRef<HTMLInputElement>(null)
-  const abortControllerRef = React.useRef<AbortController | null>(null)
+  const router = useRouter();
+  const [step, setStep] = React.useState<RepositorySetupStep>(0);
+  const [direction, setDirection] = React.useState<WizardDirection>(1);
+  const [checkStatus, setCheckStatus] =
+    React.useState<RepositoryCheckStatus>("idle");
+  const [checkError, setCheckError] = React.useState<string | null>(null);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
+  const repositoryInputRef = React.useRef<HTMLInputElement>(null);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
   React.useEffect(() => {
-    return () => abortControllerRef.current?.abort()
-  }, [])
+    return () => abortControllerRef.current?.abort();
+  }, []);
 
   React.useEffect(() => {
     if (step !== 0) {
-      return
+      return;
     }
 
-    const frame = requestAnimationFrame(() => repositoryInputRef.current?.focus())
-    return () => cancelAnimationFrame(frame)
-  }, [step])
+    const frame = requestAnimationFrame(() =>
+      repositoryInputRef.current?.focus(),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [step]);
 
   React.useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape" && !isSaving) {
-        onClose()
+        onClose();
       }
     }
 
-    document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [isSaving, onClose])
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isSaving, onClose]);
 
-  function goToStep(nextStep: RepositorySetupStep, nextDirection: WizardDirection) {
-    setDirection(nextDirection)
-    setStep(nextStep)
+  function goToStep(
+    nextStep: RepositorySetupStep,
+    nextDirection: WizardDirection,
+  ) {
+    setDirection(nextDirection);
+    setStep(nextStep);
   }
 
   function handleRepositoryChange(value: string) {
-    setRepository(value)
-    setCheckStatus("idle")
-    setCheckError(null)
+    setRepository(value);
+    setCheckStatus("idle");
+    setCheckError(null);
   }
 
   async function checkRepository() {
-    const normalizedRepository = normalizeRepository(repository)
+    const normalizedRepository = normalizeRepository(repository);
 
     if (!isRepositoryName(normalizedRepository)) {
-      setCheckStatus("error")
-      setCheckError("Enter a repository in owner/repository format.")
-      return
+      setCheckStatus("error");
+      setCheckError("Enter a repository in owner/repository format.");
+      return;
     }
 
-    setRepository(normalizedRepository)
+    setRepository(normalizedRepository);
 
     if (checkStatus === "success") {
-      goToStep(1, 1)
-      return
+      goToStep(1, 1);
+      return;
     }
 
-    abortControllerRef.current?.abort()
-    const controller = new AbortController()
-    abortControllerRef.current = controller
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
-    setCheckStatus("checking")
-    setCheckError(null)
+    setCheckStatus("checking");
+    setCheckError(null);
 
     try {
       const response = await fetch("/api/repositories/check", {
@@ -106,60 +112,69 @@ export function RepositorySetupWizard({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ repository: normalizedRepository }),
         signal: controller.signal,
-      })
-      const data = (await response.json().catch(() => null)) as RepositoryCheckResult | null
+      });
+      const data = (await response
+        .json()
+        .catch(() => null)) as RepositoryCheckResult | null;
 
       if (!response.ok) {
-        setCheckStatus("error")
+        setCheckStatus("error");
         setCheckError(
           data?.error ??
             "We couldn't reach that repository. Check the name; private repositories aren't available yet.",
-        )
-        return
+        );
+        return;
       }
 
       if (!data?.repository) {
-        setCheckStatus("error")
-        setCheckError("We couldn't verify that repository. Please try again.")
-        return
+        setCheckStatus("error");
+        setCheckError("We couldn't verify that repository. Please try again.");
+        return;
       }
 
-      setRepository(data.repository.fullName)
-      setCheckStatus("success")
+      setRepository(data.repository.fullName);
+      setCheckStatus("success");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        return
+        return;
       }
 
-      setCheckStatus("error")
-      setCheckError("Something went wrong while checking the repository. Please try again.")
+      setCheckStatus("error");
+      setCheckError(
+        "Something went wrong while checking the repository. Please try again.",
+      );
     }
   }
 
   async function handleFinish() {
-    setIsSaving(true)
-    setSaveError(null)
+    setIsSaving(true);
+    setSaveError(null);
 
     try {
       const response = await fetch("/api/repositories", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ repository }),
-      })
-      const data = (await response.json().catch(() => null)) as RepositorySaveResult | null
+      });
+      const data = (await response
+        .json()
+        .catch(() => null)) as RepositorySaveResult | null;
 
       if (!response.ok) {
-        setSaveError(data?.error ?? "We couldn't connect this repository. Please try again.")
-        return
+        setSaveError(
+          data?.error ??
+            "We couldn't connect this repository. Please try again.",
+        );
+        return;
       }
 
-      onComplete()
-      toast.success("Repository connected")
-      router.refresh()
+      onComplete();
+      toast.success("Repository connected");
+      router.refresh();
     } catch {
-      setSaveError("We couldn't connect this repository. Please try again.")
+      setSaveError("We couldn't connect this repository. Please try again.");
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
   }
 
@@ -213,5 +228,5 @@ export function RepositorySetupWizard({
         </div>
       </div>
     </motion.div>
-  )
+  );
 }

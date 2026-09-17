@@ -1,14 +1,13 @@
 import { z } from "zod";
 import { isRepositoryName, normalizeRepository } from "./repository-name";
 
-
 type RepositoryRequest = {
-  repository?: unknown
-}
+  repository?: unknown;
+};
 
 export type PublicRepository = {
-  fullName: string
-}
+  fullName: string;
+};
 
 const pullRequestSchema = z
   .object({
@@ -29,16 +28,20 @@ const pullRequestSchema = z
 const pullRequestsSchema = z.array(pullRequestSchema);
 export type PullRequest = z.output<typeof pullRequestSchema>;
 
-
-type CheckRepositoryRequestResp = { success: false, error: string } | { success: true, repository: string };
-export async function checkRepositoryRequest(request: Request): Promise<CheckRepositoryRequestResp> {
-  const body = (await request.json().catch(() => null)) as RepositoryRequest | null;
+type CheckRepositoryRequestResp =
+  { success: false; error: string } | { success: true; repository: string };
+export async function checkRepositoryRequest(
+  request: Request,
+): Promise<CheckRepositoryRequestResp> {
+  const body = (await request
+    .json()
+    .catch(() => null)) as RepositoryRequest | null;
   const searchRepository = new URL(request.url).searchParams.get("repository");
 
   const input =
     typeof body?.repository === "string"
       ? body.repository
-      : searchRepository ?? "";
+      : (searchRepository ?? "");
 
   const repository = normalizeRepository(input);
 
@@ -52,14 +55,13 @@ export async function checkRepositoryRequest(request: Request): Promise<CheckRep
   return { success: true, repository };
 }
 
-
 export async function getPublicRepository(
   repository: string,
 ): Promise<PublicRepository | null> {
-  const [owner, name] = repository.split("/")
+  const [owner, name] = repository.split("/");
 
   if (!owner || !name) {
-    return null
+    return null;
   }
 
   const response = await fetch(
@@ -72,26 +74,26 @@ export async function getPublicRepository(
       },
       cache: "no-store",
     },
-  )
+  );
 
   if (response.status === 404) {
-    return null
+    return null;
   }
 
   if (!response.ok) {
-    throw new Error(`GitHub returned ${response.status}`)
+    throw new Error(`GitHub returned ${response.status}`);
   }
 
   const data = (await response.json()) as {
-    full_name?: unknown
-    private?: unknown
-  }
+    full_name?: unknown;
+    private?: unknown;
+  };
 
   if (typeof data.full_name !== "string" || data.private === true) {
-    return null
+    return null;
   }
 
-  return { fullName: data.full_name }
+  return { fullName: data.full_name };
 }
 
 export async function getOpenPullRequests(
@@ -100,14 +102,14 @@ export async function getOpenPullRequests(
     page,
     perPage,
   }: {
-    page: number
-    perPage: number
+    page: number;
+    perPage: number;
   },
-): Promise<{ pullRequests: PullRequest[], hasNextPage: boolean } | null> {
-  const [owner, name] = repository.split("/")
+): Promise<{ pullRequests: PullRequest[]; hasNextPage: boolean } | null> {
+  const [owner, name] = repository.split("/");
 
   if (!owner || !name) {
-    return null
+    return null;
   }
 
   if (
@@ -117,10 +119,12 @@ export async function getOpenPullRequests(
     perPage < 1 ||
     perPage > 100
   ) {
-    throw new Error("Invalid pull request pagination parameters")
+    throw new Error("Invalid pull request pagination parameters");
   }
 
-  const url = new URL(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/pulls`);
+  const url = new URL(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/pulls`,
+  );
 
   url.search = new URLSearchParams({
     state: "open",
@@ -140,17 +144,17 @@ export async function getOpenPullRequests(
   });
 
   if (response.status === 404) {
-    return null
+    return null;
   }
 
   if (!response.ok) {
-    throw new Error(`GitHub returned ${response.status}`)
+    throw new Error(`GitHub returned ${response.status}`);
   }
 
   const data: unknown = await response.json();
-  
+
   return {
     pullRequests: pullRequestsSchema.parse(data),
     hasNextPage: response.headers.get("link")?.includes('rel="next"') ?? false,
-  }
+  };
 }

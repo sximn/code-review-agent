@@ -1,35 +1,34 @@
-import { and, desc, eq, sql } from "drizzle-orm"
+import { and, desc, eq, sql } from "drizzle-orm";
 
-import { db } from "@/db/drizzle"
-import { repository, review } from "@/db/schema"
-
+import { db } from "@/db/drizzle";
+import { repository, review } from "@/db/schema";
 
 export type ConnectedRepository = {
-  id: string,
-  name: string,
-  reviewedPullRequests: number,
-  reviewInProgress: boolean,
-}
+  id: string;
+  name: string;
+  reviewedPullRequests: number;
+  reviewInProgress: boolean;
+};
 
 export type DashboardOverview = {
   metricsThisWeek: {
-    reviews: number
-    issuesCaught: number
-    averageReviewTimeMinutes: number | null
-  }
-  connectedRepositories: ConnectedRepository[]
-}
+    reviews: number;
+    issuesCaught: number;
+    averageReviewTimeMinutes: number | null;
+  };
+  connectedRepositories: ConnectedRepository[];
+};
 
 export type Review = {
-  id: string
-  pullRequestTitle: string
-  repository: string
-  reviewedAt: string
-  issuesFound: number
-}
+  id: string;
+  pullRequestTitle: string;
+  repository: string;
+  reviewedAt: string;
+  issuesFound: number;
+};
 
 export async function getDashboardOverview(
-  userId: string
+  userId: string,
 ): Promise<DashboardOverview> {
   const [connectedRepositories, [metrics]] = await Promise.all([
     db
@@ -97,7 +96,7 @@ export async function getDashboardOverview(
       .from(review)
       .innerJoin(repository, eq(review.repositoryId, repository.id))
       .where(eq(repository.userId, userId)),
-  ])
+  ]);
 
   const avgMinutesFourDecimal = metrics.averageReviewTimeMinutesThisWeek
     ? Math.round(metrics.averageReviewTimeMinutesThisWeek * 10000) / 10000
@@ -110,7 +109,7 @@ export async function getDashboardOverview(
       averageReviewTimeMinutes: avgMinutesFourDecimal,
     },
     connectedRepositories: connectedRepositories,
-  }
+  };
 }
 
 export async function getRepositoryReviews(
@@ -143,7 +142,7 @@ export async function getRepositoryReviews(
 }
 
 export async function getRecentReviews(userId: string): Promise<Review[]> {
-  void userId
+  void userId;
 
-  return []
+  return [];
 }

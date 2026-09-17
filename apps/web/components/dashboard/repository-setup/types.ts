@@ -1,16 +1,16 @@
-export type RepositorySetupStep = 0 | 1 | 2
+export type RepositorySetupStep = 0 | 1 | 2;
 
-export type RepositoryCheckStatus = "idle" | "checking" | "success" | "error"
+export type RepositoryCheckStatus = "idle" | "checking" | "success" | "error";
 
 export type RepositoryCheckResult = {
   repository?: {
-    fullName: string
-  }
-  error?: string
-}
+    fullName: string;
+  };
+  error?: string;
+};
 
 export type RepositorySaveResult = {
-  error?: string
-}
+  error?: string;
+};
 
-export type WizardDirection = 1 | -1
+export type WizardDirection = 1 | -1;
