@@ -42,6 +42,7 @@ import { LastUsedBadge } from "./last-login-method/last-used-badge";
 import { ProviderButtons, type SocialLayout } from "./provider-buttons";
 import { ReauthenticationNotice } from "./reauthentication";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import Image from "next/image";
 
 export type SignInProps = {
   className?: string;
@@ -52,7 +53,7 @@ export type SignInProps = {
 function DitheredWaveBg() {
   return (
     <div className="flex size-full items-center justify-center">
-      <img
+      <Image
         alt="Dithered wave"
         aria-hidden="true"
         className="aspect-video size-full rounded-2xl border-2 border-border bg-no-repeat object-cover brightness-95 dark:brightness-85"
