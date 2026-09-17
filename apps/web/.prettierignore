@@ -1,0 +1,6 @@
+.next/
+drizzle/
+node_modules/
+pnpm-lock.yaml
+public/
+*.tsbuildinfo

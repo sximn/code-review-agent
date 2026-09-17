@@ -1,22 +1,28 @@
-import { ArrowRight, CheckCircle2, Code2, GitPullRequest, LoaderCircle } from "lucide-react"
-import { AnimatePresence, motion } from "motion/react"
+import {
+  ArrowRight,
+  CheckCircle2,
+  Code2,
+  GitPullRequest,
+  LoaderCircle,
+} from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 
-import { RepositorySetupWizard } from "./repository-setup/repository-setup-wizard"
-import { ConnectedRepository } from "@/lib/dashboard"
-import { RepositoryRow } from "./connected-repositories/repository-row"
+import { RepositorySetupWizard } from "./repository-setup/repository-setup-wizard";
+import { ConnectedRepository } from "@/lib/dashboard";
+import { RepositoryRow } from "./connected-repositories/repository-row";
 
 type RepositoryWorkspaceProps = {
-  isEmpty: boolean
-  configuring: boolean
-  repository: string
-  connectedRepositories: ConnectedRepository[]
-  setRepository: (repository: string) => void
-  onConfigure: () => void
-  onClose: () => void
-  onComplete: () => void
-}
+  isEmpty: boolean;
+  configuring: boolean;
+  repository: string;
+  connectedRepositories: ConnectedRepository[];
+  setRepository: (repository: string) => void;
+  onConfigure: () => void;
+  onClose: () => void;
+  onComplete: () => void;
+};
 
 export function RepositoryWorkspace({
   isEmpty,
@@ -40,9 +46,7 @@ export function RepositoryWorkspace({
         "bg-[linear-gradient(135deg,#f4f8ff,#fff_52%,#f3f7ff)]",
         "dark:bg-[linear-gradient(135deg,#070d1a,#0d121f_52%,#060914)]",
         "dark:shadow-[0_16px_40px_rgba(0,0,0,0.25)]",
-        configuring
-          ? "min-h-[min(620px,calc(100vh-7rem))]"
-          : "min-h-105",
+        configuring ? "min-h-[min(620px,calc(100vh-7rem))]" : "min-h-105",
       ].join(" ")}
       style={{ transformOrigin: "center bottom" }}
     >
@@ -50,10 +54,14 @@ export function RepositoryWorkspace({
 
       <AnimatePresence initial={false} mode="wait">
         {!configuring ? (
-          isEmpty 
-            ? <EmptyRepositoryState key="empty" onConfigure={onConfigure} />
-            : <ConnectedRepositories key="repos" repositories={connectedRepositories} />
-          
+          isEmpty ? (
+            <EmptyRepositoryState key="empty" onConfigure={onConfigure} />
+          ) : (
+            <ConnectedRepositories
+              key="repos"
+              repositories={connectedRepositories}
+            />
+          )
         ) : (
           <RepositorySetupWizard
             key="setup"
@@ -65,7 +73,7 @@ export function RepositoryWorkspace({
         )}
       </AnimatePresence>
     </motion.section>
-  )
+  );
 }
 
 function WorkspaceBackground({ configuring }: { configuring: boolean }) {
@@ -73,9 +81,12 @@ function WorkspaceBackground({ configuring }: { configuring: boolean }) {
     <>
       <motion.div
         aria-hidden="true"
-        animate={{ opacity: configuring ? 0.13 : 0.55, scale: configuring ? 1.035 : 1 }}
+        animate={{
+          opacity: configuring ? 0.13 : 0.55,
+          scale: configuring ? 1.035 : 1,
+        }}
         transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(#dce6f5_1px,transparent_1px),linear-gradient(90deg,#dce6f5_1px,transparent_1px)] bg-size-[45px_45px] mask-[linear-gradient(transparent,black_30%,black_65%,transparent)] dark:bg-[linear-gradient(#263753_1px,transparent_1px),linear-gradient(90deg,#263753_1px,transparent_1px)]"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(#dce6f5_1px,transparent_1px),linear-gradient(90deg,#dce6f5_1px,transparent_1px)] mask-[linear-gradient(transparent,black_30%,black_65%,transparent)] bg-size-[45px_45px] dark:bg-[linear-gradient(#263753_1px,transparent_1px),linear-gradient(90deg,#263753_1px,transparent_1px)]"
       />
       <motion.div
         aria-hidden="true"
@@ -97,17 +108,13 @@ function WorkspaceBackground({ configuring }: { configuring: boolean }) {
           scale: configuring ? 1.08 : 1,
         }}
         transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
-        className="pointer-events-none absolute -right-35 -top-42.5 size-87.5 rounded-full border border-[#bdd2f8] dark:border-[#29466f]"
+        className="pointer-events-none absolute -top-42.5 -right-35 size-87.5 rounded-full border border-[#bdd2f8] dark:border-[#29466f]"
       />
     </>
-  )
+  );
 }
 
-function EmptyRepositoryState({
-  onConfigure,
-}: {
-  onConfigure: () => void
-}) {
+function EmptyRepositoryState({ onConfigure }: { onConfigure: () => void }) {
   return (
     <motion.div
       layout
@@ -117,30 +124,47 @@ function EmptyRepositoryState({
       transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
       className={"relative grid min-h-105 place-items-center"}
     >
-      <motion.div layout="position" className="relative flex max-w-md flex-col items-center p-7.5 text-center">
+      <motion.div
+        layout="position"
+        className="relative flex max-w-md flex-col items-center p-7.5 text-center"
+      >
         <div className="grid size-10 place-items-center rounded-xl border border-border bg-background text-foreground shadow-sm">
           <Code2 aria-hidden="true" size={24} strokeWidth={2.25} />
         </div>
-        <h2 id="review-space-heading" className="mt-2 text-2xl font-medium tracking-[-0.055em] text-foreground sm:text-3xl">
+        <h2
+          id="review-space-heading"
+          className="mt-2 text-2xl font-medium tracking-[-0.055em] text-foreground sm:text-3xl"
+        >
           Nothing reviewed yet.
         </h2>
         <p className="mt-2 max-w-sm text-sm leading-5 text-muted-foreground">
-          Connect a repository and REWY will start looking for what your team might miss.
+          Connect a repository and REWY will start looking for what your team
+          might miss.
         </p>
-        
-        <Button type="button" onClick={onConfigure} variant="outline" size="lg" className="group mt-7 gap-2">
+
+        <Button
+          type="button"
+          onClick={onConfigure}
+          variant="outline"
+          size="lg"
+          className="group mt-7 gap-2"
+        >
           Set up your first repository
-          <ArrowRight aria-hidden="true" size={17} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+          <ArrowRight
+            aria-hidden="true"
+            size={17}
+            className="transition-transform duration-200 group-hover:translate-x-0.5"
+          />
         </Button>
       </motion.div>
     </motion.div>
-  )
+  );
 }
 
 function ConnectedRepositories({
   repositories,
 }: {
-  repositories: ConnectedRepository[]
+  repositories: ConnectedRepository[];
 }) {
   return (
     <motion.div
@@ -182,5 +206,5 @@ function ConnectedRepositories({
         </motion.ul>
       </motion.div>
     </motion.div>
-  )
+  );
 }

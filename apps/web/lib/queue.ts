@@ -1,11 +1,10 @@
 import { getRedis } from "./redis";
 import env from "@/lib/environment";
 
-
 export type ReviewJobPayload = {
   repository: string;
   pull_request: number;
-}
+};
 
 export async function enqueueReviewJob(
   jobId: string,

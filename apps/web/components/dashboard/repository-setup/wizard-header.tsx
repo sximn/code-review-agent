@@ -1,15 +1,15 @@
-import { X } from "lucide-react"
+import { X } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 
-import { SetupProgress } from "./setup-progress"
-import type { RepositorySetupStep } from "./types"
+import { SetupProgress } from "./setup-progress";
+import type { RepositorySetupStep } from "./types";
 
 type WizardHeaderProps = {
-  step: RepositorySetupStep
-  onClose: () => void
-  isBusy: boolean
-}
+  step: RepositorySetupStep;
+  onClose: () => void;
+  isBusy: boolean;
+};
 
 export function WizardHeader({ step, onClose, isBusy }: WizardHeaderProps) {
   return (
@@ -49,5 +49,5 @@ export function WizardHeader({ step, onClose, isBusy }: WizardHeaderProps) {
         <SetupProgress step={step} />
       </div>
     </>
-  )
+  );
 }

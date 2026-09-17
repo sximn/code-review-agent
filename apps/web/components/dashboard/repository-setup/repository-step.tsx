@@ -1,23 +1,27 @@
-import { ArrowRight, CheckCircle2, LoaderCircle } from "lucide-react"
-import { AnimatePresence, motion } from "motion/react"
+import { ArrowRight, CheckCircle2, LoaderCircle } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 
-import GithubLogo from "@/components/logos/github"
-import { Button } from "@/components/ui/button"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
-import { Label } from "@/components/ui/label"
+import GithubLogo from "@/components/logos/github";
+import { Button } from "@/components/ui/button";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 
-import { STEP_TRANSITION, STEP_VARIANTS } from "./step-motion"
-import type { RepositoryCheckStatus, WizardDirection } from "./types"
+import { STEP_TRANSITION, STEP_VARIANTS } from "./step-motion";
+import type { RepositoryCheckStatus, WizardDirection } from "./types";
 
 type RepositoryStepProps = {
-  repository: string
-  onRepositoryChange: (value: string) => void
-  status: RepositoryCheckStatus
-  error: string | null
-  onContinue: () => void
-  inputRef: React.RefObject<HTMLInputElement | null>
-  direction: WizardDirection
-}
+  repository: string;
+  onRepositoryChange: (value: string) => void;
+  status: RepositoryCheckStatus;
+  error: string | null;
+  onContinue: () => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  direction: WizardDirection;
+};
 
 export function RepositoryStep({
   repository,
@@ -28,9 +32,9 @@ export function RepositoryStep({
   inputRef,
   direction,
 }: RepositoryStepProps) {
-  const isChecking = status === "checking"
-  const isSuccess = status === "success"
-  const isError = status === "error"
+  const isChecking = status === "checking";
+  const isSuccess = status === "success";
+  const isError = status === "error";
 
   return (
     <motion.div
@@ -46,15 +50,16 @@ export function RepositoryStep({
         Which repository should REWY review?
       </h3>
       <p className="mt-3 max-w-lg text-sm leading-6 text-muted-foreground sm:text-base">
-        Enter the GitHub repository using the <span className="font-medium text-foreground">owner/repository</span>{" "}
+        Enter the GitHub repository using the{" "}
+        <span className="font-medium text-foreground">owner/repository</span>{" "}
         format.
       </p>
 
       <form
         className="mt-2"
         onSubmit={(event) => {
-          event.preventDefault()
-          onContinue()
+          event.preventDefault();
+          onContinue();
         }}
       >
         <Label htmlFor="repository">GitHub repository</Label>
@@ -74,7 +79,11 @@ export function RepositoryStep({
             placeholder="owner/repo"
           />
           <InputGroupAddon>
-            <GithubLogo aria-hidden="true" size={18} className="text-muted-foreground" />
+            <GithubLogo
+              aria-hidden="true"
+              size={18}
+              className="text-muted-foreground"
+            />
           </InputGroupAddon>
         </InputGroup>
 
@@ -87,8 +96,16 @@ export function RepositoryStep({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div role="status" aria-live="polite" className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-                <LoaderCircle aria-hidden="true" size={16} className="animate-spin" />
+              <div
+                role="status"
+                aria-live="polite"
+                className="mt-3 flex items-center gap-2 text-sm text-muted-foreground"
+              >
+                <LoaderCircle
+                  aria-hidden="true"
+                  size={16}
+                  className="animate-spin"
+                />
                 Checking repository and pull request access...
               </div>
             </motion.div>
@@ -102,12 +119,24 @@ export function RepositoryStep({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div role="status" aria-live="polite" className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/6 p-4">
+              <div
+                role="status"
+                aria-live="polite"
+                className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/6 p-4"
+              >
                 <div className="flex gap-3">
-                  <CheckCircle2 aria-hidden="true" size={18} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <CheckCircle2
+                    aria-hidden="true"
+                    size={18}
+                    className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                  />
                   <div>
-                    <p className="text-sm font-medium text-foreground">Repository found</p>
-                    <p className="mt-1 text-sm text-muted-foreground">We can reach this public repository.</p>
+                    <p className="text-sm font-medium text-foreground">
+                      Repository found
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      We can reach this public repository.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -122,10 +151,17 @@ export function RepositoryStep({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div id="repository-error" role="alert" className="mt-3 rounded-xl border border-destructive/20 bg-destructive/4.5 p-4">
-                <p className="text-sm font-medium text-foreground">We couldn&apos;t access this repository.</p>
+              <div
+                id="repository-error"
+                role="alert"
+                className="mt-3 rounded-xl border border-destructive/20 bg-destructive/4.5 p-4"
+              >
+                <p className="text-sm font-medium text-foreground">
+                  We couldn&apos;t access this repository.
+                </p>
                 <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                  {error ?? "Check the repository name. Private repositories aren't available yet."}
+                  {error ??
+                    "Check the repository name. Private repositories aren't available yet."}
                 </p>
               </div>
             </motion.div>
@@ -133,17 +169,34 @@ export function RepositoryStep({
         </AnimatePresence>
 
         <div className="mt-2 flex justify-end">
-          <Button type="submit" disabled={!repository.trim() || isChecking} className="min-w-31 gap-2">
+          <Button
+            type="submit"
+            disabled={!repository.trim() || isChecking}
+            className="min-w-31 gap-2"
+          >
             {isChecking ? (
-              <><LoaderCircle aria-hidden="true" size={16} className="animate-spin" />Checking</>
+              <>
+                <LoaderCircle
+                  aria-hidden="true"
+                  size={16}
+                  className="animate-spin"
+                />
+                Checking
+              </>
             ) : isSuccess ? (
-              <>Continue<ArrowRight aria-hidden="true" size={16} /></>
+              <>
+                Continue
+                <ArrowRight aria-hidden="true" size={16} />
+              </>
             ) : (
-              <>Check repository<ArrowRight aria-hidden="true" size={16} /></>
+              <>
+                Check repository
+                <ArrowRight aria-hidden="true" size={16} />
+              </>
             )}
           </Button>
         </div>
       </form>
     </motion.div>
-  )
+  );
 }

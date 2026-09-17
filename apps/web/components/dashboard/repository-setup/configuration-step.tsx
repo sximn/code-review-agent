@@ -1,20 +1,20 @@
-import { ArrowLeft, Check, CheckCircle2, LoaderCircle } from "lucide-react"
-import { motion } from "motion/react"
+import { ArrowLeft, Check, CheckCircle2, LoaderCircle } from "lucide-react";
+import { motion } from "motion/react";
 
-import GithubLogo from "@/components/logos/github"
-import { Button } from "@/components/ui/button"
+import GithubLogo from "@/components/logos/github";
+import { Button } from "@/components/ui/button";
 
-import { STEP_TRANSITION, STEP_VARIANTS } from "./step-motion"
-import type { WizardDirection } from "./types"
+import { STEP_TRANSITION, STEP_VARIANTS } from "./step-motion";
+import type { WizardDirection } from "./types";
 
 type ConfigurationStepProps = {
-  repository: string
-  onBack: () => void
-  onFinish: () => Promise<void>
-  isSaving: boolean
-  saveError: string | null
-  direction: WizardDirection
-}
+  repository: string;
+  onBack: () => void;
+  onFinish: () => Promise<void>;
+  isSaving: boolean;
+  saveError: string | null;
+  direction: WizardDirection;
+};
 
 export function ConfigurationStep({
   repository,
@@ -48,7 +48,9 @@ export function ConfigurationStep({
           </div>
           <div className="min-w-0">
             <p className="font-medium text-foreground">{repository}</p>
-            <p className="mt-0.5 text-sm text-muted-foreground">GitHub repository</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              GitHub repository
+            </p>
           </div>
           <CheckCircle2
             aria-hidden="true"
@@ -59,35 +61,67 @@ export function ConfigurationStep({
 
         <div className="grid gap-px bg-border/60 sm:grid-cols-2">
           <div className="bg-background/80 p-5">
-            <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Repository</p>
-            <p className="mt-2 text-sm font-medium text-foreground">Public access verified</p>
+            <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">
+              Repository
+            </p>
+            <p className="mt-2 text-sm font-medium text-foreground">
+              Public access verified
+            </p>
           </div>
           <div className="bg-background/80 p-5">
-            <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Connection</p>
-            <p className="mt-2 text-sm font-medium text-foreground">Ready to add to your workspace</p>
+            <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">
+              Connection
+            </p>
+            <p className="mt-2 text-sm font-medium text-foreground">
+              Ready to add to your workspace
+            </p>
           </div>
         </div>
       </div>
 
       {saveError && (
-        <div role="alert" className="mt-4 rounded-xl border border-destructive/20 bg-destructive/4.5 p-4 text-sm text-muted-foreground">
+        <div
+          role="alert"
+          className="mt-4 rounded-xl border border-destructive/20 bg-destructive/4.5 p-4 text-sm text-muted-foreground"
+        >
           {saveError}
         </div>
       )}
 
       <div className="mt-8 flex items-center justify-between gap-3">
-        <Button type="button" variant="ghost" onClick={onBack} disabled={isSaving} className="gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onBack}
+          disabled={isSaving}
+          className="gap-2"
+        >
           <ArrowLeft aria-hidden="true" size={16} />
           Back
         </Button>
-        <Button type="button" onClick={() => void onFinish()} disabled={isSaving} className="gap-2">
+        <Button
+          type="button"
+          onClick={() => void onFinish()}
+          disabled={isSaving}
+          className="gap-2"
+        >
           {isSaving ? (
-            <><LoaderCircle aria-hidden="true" size={16} className="animate-spin" />Connecting</>
+            <>
+              <LoaderCircle
+                aria-hidden="true"
+                size={16}
+                className="animate-spin"
+              />
+              Connecting
+            </>
           ) : (
-            <><Check aria-hidden="true" size={16} />Connect repository</>
+            <>
+              <Check aria-hidden="true" size={16} />
+              Connect repository
+            </>
           )}
         </Button>
       </div>
     </motion.div>
-  )
+  );
 }

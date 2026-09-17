@@ -51,7 +51,6 @@ export type Finding = z.infer<typeof findingSchema>;
 export type ReviewResult = z.infer<typeof reviewResultSchema>;
 export type ReviewState = z.infer<typeof reviewStateSchema>;
 
-
 export const reviewStatusSchema = z.enum([
   "scheduled",
   "running",
@@ -59,9 +58,7 @@ export const reviewStatusSchema = z.enum([
   "failed",
 ]);
 
-const apiDateSchema = z.iso
-  .datetime()
-  .transform((value) => new Date(value));
+const apiDateSchema = z.iso.datetime().transform((value) => new Date(value));
 
 export const repositoryReviewSchema = z
   .object({

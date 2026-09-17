@@ -1,23 +1,23 @@
-import * as React from "react"
-import { Check, LockKeyhole, Settings2 } from "lucide-react"
+import * as React from "react";
+import { Check, LockKeyhole, Settings2 } from "lucide-react";
 
-import GithubLogo from "@/components/logos/github"
+import GithubLogo from "@/components/logos/github";
 
-import type { RepositorySetupStep } from "./types"
+import type { RepositorySetupStep } from "./types";
 
 const SETUP_STEPS = [
   { label: "Repository", icon: GithubLogo },
   { label: "Access", icon: LockKeyhole },
   { label: "Configure", icon: Settings2 },
-] as const
+] as const;
 
 export function SetupProgress({ step }: { step: RepositorySetupStep }) {
   return (
     <div className="flex items-center gap-2">
       {SETUP_STEPS.map((item, index) => {
-        const Icon = item.icon
-        const isComplete = index < step
-        const isActive = index === step
+        const Icon = item.icon;
+        const isComplete = index < step;
+        const isActive = index === step;
 
         return (
           <React.Fragment key={item.label}>
@@ -53,8 +53,8 @@ export function SetupProgress({ step }: { step: RepositorySetupStep }) {
               <span className="hidden sm:inline">{item.label}</span>
             </div>
           </React.Fragment>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

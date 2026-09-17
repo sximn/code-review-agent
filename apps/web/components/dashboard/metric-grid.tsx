@@ -1,21 +1,16 @@
-import { motion } from "motion/react"
+import { motion } from "motion/react";
 
-import { Card } from "@/components/ui/card"
-import type { DashboardOverview } from "@/lib/dashboard"
+import { Card } from "@/components/ui/card";
+import type { DashboardOverview } from "@/lib/dashboard";
 
 type MetricProps = {
-  label: string
-  value: string
-  description: string
-  bordered?: boolean
-}
+  label: string;
+  value: string;
+  description: string;
+  bordered?: boolean;
+};
 
-function Metric({
-  label,
-  value,
-  description,
-  bordered = false,
-}: MetricProps) {
+function Metric({ label, value, description, bordered = false }: MetricProps) {
   return (
     <Card
       className={[
@@ -29,18 +24,16 @@ function Metric({
         <dd className="mt-3 text-4xl font-normal tracking-[-0.08em] text-foreground">
           {value}
         </dd>
-        <dd className="mt-2 text-sm text-muted-foreground">
-          {description}
-        </dd>
+        <dd className="mt-2 text-sm text-muted-foreground">{description}</dd>
       </dl>
     </Card>
-  )
+  );
 }
 
 type MetricGridProps = {
-  metrics: DashboardOverview["metricsThisWeek"]
-  isEmpty: boolean
-}
+  metrics: DashboardOverview["metricsThisWeek"];
+  isEmpty: boolean;
+};
 
 export function MetricGrid({ metrics, isEmpty }: MetricGridProps) {
   return (
@@ -52,19 +45,19 @@ export function MetricGrid({ metrics, isEmpty }: MetricGridProps) {
     >
       <Metric
         label="Reviews this week"
-        value={
-          metrics.reviews == null
-            ? "—"
-            : String(metrics.reviews)
-        }
+        value={metrics.reviews == null ? "—" : String(metrics.reviews)}
         description={isEmpty ? "Awaiting your first repo" : "Completed reviews"}
         bordered
       />
       <Metric
         label="Issues caught this week"
-        value={metrics.issuesCaught == null ? "—" : String(metrics.issuesCaught)}
+        value={
+          metrics.issuesCaught == null ? "—" : String(metrics.issuesCaught)
+        }
         description={
-          isEmpty ? "Insights will appear here" : "Across reviewed pull requests"
+          isEmpty
+            ? "Insights will appear here"
+            : "Across reviewed pull requests"
         }
         bordered
       />
@@ -80,5 +73,5 @@ export function MetricGrid({ metrics, isEmpty }: MetricGridProps) {
         }
       />
     </motion.section>
-  )
+  );
 }

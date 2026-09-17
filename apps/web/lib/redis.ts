@@ -1,5 +1,5 @@
 import { createClient } from "redis";
-import env from '@/lib/environment';
+import env from "@/lib/environment";
 
 let redis: ReturnType<typeof createClient> | undefined;
 

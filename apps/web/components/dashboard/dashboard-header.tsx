@@ -1,6 +1,6 @@
-import { ArrowRight, Plus } from "lucide-react"
+import { ArrowRight, Plus } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 
 const GREETINGS = [
   (name: string) => `Good to see you, ${name}.`,
@@ -23,24 +23,24 @@ const GREETINGS = [
   (name: string) => `One step closer, ${name}.`,
   (name: string) => `Let's turn ideas into action, ${name}.`,
   (name: string) => `Welcome to your command center, ${name}.`,
-]
+];
 
 function getGreeting(name: string): string {
-  const today = new Date().toISOString().slice(0, 10)
-  let seed = 0
+  const today = new Date().toISOString().slice(0, 10);
+  let seed = 0;
 
   for (const character of today) {
-    seed = (seed * 31 + character.charCodeAt(0)) >>> 0
+    seed = (seed * 31 + character.charCodeAt(0)) >>> 0;
   }
 
-  return GREETINGS[seed % GREETINGS.length](name)
+  return GREETINGS[seed % GREETINGS.length](name);
 }
 
 type DashboardHeaderProps = {
-  isEmpty: boolean
-  userName: string
-  onConfigure: () => void
-}
+  isEmpty: boolean;
+  userName: string;
+  onConfigure: () => void;
+};
 
 export function DashboardHeader({
   isEmpty,
@@ -87,5 +87,5 @@ export function DashboardHeader({
         <ArrowRight aria-hidden="true" size={18} />
       </Button>
     </section>
-  )
+  );
 }

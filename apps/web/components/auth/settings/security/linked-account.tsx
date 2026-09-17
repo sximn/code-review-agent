@@ -1,47 +1,47 @@
-"use client"
+"use client";
 
 import {
   type AuthSocialProvider,
   getProviderId,
   getProviderName,
-  isReauthenticationRequiredError
-} from "@better-auth-ui/core"
+  isReauthenticationRequiredError,
+} from "@better-auth-ui/core";
 import {
   renderProviderIcon,
   useAccountInfo,
   useAuth,
   useLinkSocial,
-  useUnlinkAccount
-} from "@better-auth-ui/react"
-import type { Account } from "better-auth"
-import { Link2, Link2Off, Plug } from "lucide-react"
-import { toast } from "sonner"
+  useUnlinkAccount,
+} from "@better-auth-ui/react";
+import type { Account } from "better-auth";
+import { Link2, Link2Off, Plug } from "lucide-react";
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog"
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemMedia,
-  ItemTitle
-} from "@/components/ui/item"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Spinner } from "@/components/ui/spinner"
-import { cn } from "@/lib/utils"
-import { ReauthenticationAction } from "../../reauthentication"
+  ItemTitle,
+} from "@/components/ui/item";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
+import { ReauthenticationAction } from "../../reauthentication";
 
 export type LinkedAccountProps = {
-  account?: Account
-  canUnlink?: boolean
-  provider: AuthSocialProvider | string
-}
+  account?: Account;
+  canUnlink?: boolean;
+  provider: AuthSocialProvider | string;
+};
 
 /**
  * Render a single linked social account row with provider info and link/unlink control.
@@ -56,44 +56,44 @@ export type LinkedAccountProps = {
 export function LinkedAccount({
   account,
   canUnlink = true,
-  provider
+  provider,
 }: LinkedAccountProps) {
-  const { authClient, baseURL, localization } = useAuth()
+  const { authClient, baseURL, localization } = useAuth();
 
   const { data: accountInfo, isPending: isLoadingInfo } = useAccountInfo(
     authClient,
-    { query: { accountId: account?.id ?? "" } }
-  )
+    { query: { accountId: account?.id ?? "" } },
+  );
 
-  const { mutate: linkSocial, isPending: isLinking } = useLinkSocial(authClient)
+  const { mutate: linkSocial, isPending: isLinking } =
+    useLinkSocial(authClient);
 
   const unlinkAccount = useUnlinkAccount(authClient, {
     meta: { errorPresentation: "inline" },
     onError: (error) => {
       if (!isReauthenticationRequiredError(error)) {
-        toast.error(error.error?.message ?? error.message)
+        toast.error(error.error?.message ?? error.message);
       }
     },
-    onSuccess: () => toast.success(localization.settings.accountUnlinked)
-  })
+    onSuccess: () => toast.success(localization.settings.accountUnlinked),
+  });
 
-  const providerId = getProviderId(provider)
-  const providerIcon = renderProviderIcon(provider)
-  const providerName = getProviderName(provider)
+  const providerId = getProviderId(provider);
+  const providerIcon = renderProviderIcon(provider);
+  const providerName = getProviderName(provider);
   const accountData = accountInfo?.data as
-    | { login?: string; username?: string }
-    | undefined
+    { login?: string; username?: string } | undefined;
 
   const displayName =
     accountData?.login ||
     accountData?.username ||
     accountInfo?.user?.email ||
     accountInfo?.user?.name ||
-    account?.accountId
+    account?.accountId;
 
   const needsReauthentication = isReauthenticationRequiredError(
-    unlinkAccount.error
-  )
+    unlinkAccount.error,
+  );
 
   return (
     <>
@@ -111,7 +111,7 @@ export function LinkedAccount({
                 ? displayName
                 : localization.settings.linkProvider.replace(
                     "{{provider}}",
-                    providerName
+                    providerName,
                   )}
             </ItemDescription>
           )}
@@ -130,7 +130,7 @@ export function LinkedAccount({
               }
               aria-label={localization.settings.unlinkProvider.replace(
                 "{{provider}}",
-                providerName
+                providerName,
               )}
             >
               {unlinkAccount.isPending ? <Spinner /> : <Link2Off />}
@@ -145,13 +145,13 @@ export function LinkedAccount({
               onClick={() =>
                 linkSocial({
                   provider: providerId,
-                  callbackURL: `${baseURL}${window.location.pathname}`
+                  callbackURL: `${baseURL}${window.location.pathname}`,
                 })
               }
               disabled={isLinking}
               aria-label={localization.settings.linkProvider.replace(
                 "{{provider}}",
-                providerName
+                providerName,
               )}
             >
               {isLinking ? <Spinner /> : <Link2 />}
@@ -164,7 +164,7 @@ export function LinkedAccount({
         <Dialog
           open={needsReauthentication}
           onOpenChange={(nextOpen) => {
-            if (!nextOpen) unlinkAccount.reset()
+            if (!nextOpen) unlinkAccount.reset();
           }}
         >
           <DialogContent>
@@ -178,5 +178,5 @@ export function LinkedAccount({
         </Dialog>
       )}
     </>
-  )
+  );
 }
