@@ -14,7 +14,7 @@ class SandboxConfig(BaseSettings):
 
     sandbox_image: str = Field(min_length=1)
     sandbox_runtime: str = Field(default="runsc", min_length=1)
-    sandbox_memory: str = Field(default="1536m")  # 1.5MB
+    sandbox_memory: str = Field(default="512m")
     sandbox_cpus: float = Field(default=1.0)
     sandbox_pids_limit: int = Field(default=128)
     sandbox_label_prefix: str = Field(default="code-review-agent")
