@@ -6,11 +6,11 @@ from functools import lru_cache
 from typing import Annotated
 
 from docker.errors import DockerException
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.concurrency import asynccontextmanager
 
 from .config import SandboxConfig
-from .sandbox_manager import SandboxManager
+from .sandbox_manager import SandboxCapacityError, SandboxManager
 from .schemas import (
     CreateSandboxRequest,
     CreateSandboxResponse,
@@ -84,13 +84,26 @@ async def create_sandbox(
         sandbox_id = await asyncio.to_thread(manager.create, request.job_id)
 
         return CreateSandboxResponse(id=sandbox_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    except SandboxCapacityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(exc),
+            headers={"Retry-After": "5"},
+        ) from exc
+
     except DockerException as exc:
         logger.exception("Docker failed to create a sandbox")
         raise HTTPException(
-            status_code=503,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Sandbox runtime is unavailable.",
+        ) from exc
+
+    except Exception as exc:
+        logger.exception("Unexpected sandbox creation failure")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Sandbox creation failed.",
         ) from exc
 
 
@@ -102,11 +115,14 @@ async def execute_command(
     config: ConfigDependency,
     manager: ManagerDependency,
 ) -> ExecCommandResponse:
+    requested_timeout = (
+        request.timeout_seconds
+        if request.timeout_seconds is not None
+        else config.sandbox_command_timeout_seconds
+    )
+    timeout = min(requested_timeout, config.sandbox_command_timeout_seconds)
+
     try:
-        timeout = min(
-            request.timeout_seconds or config.sandbox_command_timeout_seconds,
-            config.sandbox_command_timeout_seconds,
-        )
         exec_output = await asyncio.to_thread(
             manager.execute,
             sandbox_id,
@@ -121,17 +137,24 @@ async def execute_command(
             stderr=exec_output.stderr,
             truncated=exec_output.truncated,
         )
+
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Sandbox not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Sandbox not found"
+        ) from exc
+
     except DockerException as exc:
         logger.exception("Docker failed to execute a sandbox command")
         raise HTTPException(
-            status_code=503, detail="Sandbox command execution failed."
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sandbox command execution failed.",
         ) from exc
+
     except Exception as exc:
-        logger.exception("Failed to execute a sandbox command")
+        logger.exception("Unexpected failure during sandbox command execution")
         raise HTTPException(
-            status_code=500, detail="Sandbox command execution failed."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Sandbox command execution failed.",
         ) from exc
 
 
@@ -148,7 +171,16 @@ async def sandbox_status(
             id=container.id or "unknown", status=container.status
         )
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Sandbox not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Sandbox not found"
+        ) from exc
+
+    except DockerException as exc:
+        logger.exception("Docker failed to inspect a sandbox")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sandbox runtime is unavailable.",
+        ) from exc
 
 
 @app.delete("/sandboxes/{sandbox_id}")
@@ -156,5 +188,14 @@ async def destroy_sandbox(
     sandbox_id: str,
     _: AuthDependency,
     manager: ManagerDependency,
-) -> None:
-    await asyncio.to_thread(manager.destroy, sandbox_id)
+) -> Response:
+    try:
+        await asyncio.to_thread(manager.destroy, sandbox_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    except DockerException as exc:
+        logger.exception("Docker failed to destroy a sandbox")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sandbox destruction failed.",
+        ) from exc
