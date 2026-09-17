@@ -150,7 +150,7 @@ export function FluidGradient({
       "(prefers-reduced-motion: reduce)",
     ).matches;
     let frame = 0;
-    let started = performance.now();
+    const started = performance.now();
     let pointerX = 0.55;
     let pointerY = 0.5;
 
