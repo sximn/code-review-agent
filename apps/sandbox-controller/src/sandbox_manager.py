@@ -180,3 +180,6 @@ class SandboxManager:
         except KeyError:
             return
         container.remove(force=True)
+
+    def close(self):
+        self.client.close()
