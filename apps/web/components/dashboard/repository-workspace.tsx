@@ -1,10 +1,4 @@
-import {
-  ArrowRight,
-  CheckCircle2,
-  Code2,
-  GitPullRequest,
-  LoaderCircle,
-} from "lucide-react";
+import { ArrowRight, Code2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
 import { Button } from "@/components/ui/button";
