@@ -1,13 +1,8 @@
 "use client";
 
-import {
-  type AuthResult,
-  getAuthResultMessage,
-  parseAuthResult,
-} from "@better-auth-ui/core";
+import { getAuthResultMessage, parseAuthResult } from "@better-auth-ui/core";
 import { useAuth } from "@better-auth-ui/react";
 import { CircleCheckIcon, CircleXIcon, TriangleAlertIcon } from "lucide-react";
-import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useSearchParams } from "next/navigation";
 
 type AuthResultProps = {
   className?: string;
@@ -26,13 +22,14 @@ type AuthResultProps = {
 
 function AuthResultView({ className, fallbackIntent }: AuthResultProps) {
   const { basePaths, localization, navigate, viewPaths } = useAuth();
-  const [result, setResult] = useState<AuthResult>(() =>
-    parseAuthResult("", fallbackIntent),
-  );
 
-  useEffect(() => {
-    setResult(parseAuthResult(window.location.search, fallbackIntent));
-  }, [fallbackIntent]);
+  const searchParams = useSearchParams();
+  const queryString = searchParams.toString();
+
+  const result = parseAuthResult(
+    queryString ? `?${queryString}` : "",
+    fallbackIntent,
+  );
 
   const message = getAuthResultMessage(result, localization);
   const action = (() => {
