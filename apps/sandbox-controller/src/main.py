@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import secrets
 from collections.abc import AsyncGenerator
 from functools import lru_cache
 from typing import Annotated
@@ -53,12 +54,18 @@ ManagerDependency = Annotated[SandboxManager, Depends(get_manager)]
 
 def require_token(
     config: ConfigDependency,
-    x_sandbox_controller_token: str | None = Header(default=None),
+    token: Annotated[
+        str | None,
+        Header(alias="X-Sandbox-Controller-Token"),
+    ] = None,
 ) -> None:
-    if x_sandbox_controller_token != config.sandbox_controller_token:
+    if not secrets.compare_digest(token or "", config.sandbox_controller_token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
         )
+
+
+AuthDependency = Annotated[None, Depends(require_token)]
 
 
 @app.get("/health")
@@ -70,8 +77,8 @@ async def health(manager: ManagerDependency) -> dict[str, bool]:
 @app.post("/sandboxes")
 async def create_sandbox(
     request: CreateSandboxRequest,
+    _: AuthDependency,
     manager: ManagerDependency,
-    _: None = Depends(require_token),
 ) -> CreateSandboxResponse:
     try:
         sandbox_id = await asyncio.to_thread(manager.create, request.job_id)
@@ -91,9 +98,9 @@ async def create_sandbox(
 async def execute_command(
     sandbox_id: str,
     request: ExecCommandRequest,
+    _: AuthDependency,
     config: ConfigDependency,
     manager: ManagerDependency,
-    _: None = Depends(require_token),
 ) -> ExecCommandResponse:
     try:
         timeout = min(
@@ -130,7 +137,9 @@ async def execute_command(
 
 @app.get("/sandboxes/{sandbox_id}")
 async def sandbox_status(
-    sandbox_id: str, manager: ManagerDependency, _: None = Depends(require_token)
+    sandbox_id: str,
+    _: AuthDependency,
+    manager: ManagerDependency,
 ) -> SandboxStatusResponse:
     try:
         container = await asyncio.to_thread(manager.get, sandbox_id)
@@ -144,6 +153,8 @@ async def sandbox_status(
 
 @app.delete("/sandboxes/{sandbox_id}")
 async def destroy_sandbox(
-    sandbox_id: str, manager: ManagerDependency, _: None = Depends(require_token)
+    sandbox_id: str,
+    _: AuthDependency,
+    manager: ManagerDependency,
 ) -> None:
     await asyncio.to_thread(manager.destroy, sandbox_id)
