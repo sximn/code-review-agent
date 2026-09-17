@@ -1,10 +1,12 @@
 import asyncio
 import logging
+from collections.abc import AsyncGenerator
 from functools import lru_cache
 from typing import Annotated
 
 from docker.errors import DockerException
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.concurrency import asynccontextmanager
 
 from .config import SandboxConfig
 from .sandbox_manager import SandboxManager
@@ -25,9 +27,28 @@ def get_config():
     return SandboxConfig()  # pyright: ignore[reportCallIssue]
 
 
-ConfigDependency = Annotated[SandboxConfig, Depends(get_config)]
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    manager = SandboxManager(config=get_config())
+    # fail app startup if Docker not available
+    manager.client.ping()
 
-manager = SandboxManager(config=get_config())
+    app.state.sandbox_manager = manager
+
+    try:
+        yield
+    finally:
+        manager.close()
+
+
+def get_manager(request: Request) -> SandboxManager:
+    return request.app.state.sandbox_manager
+
+
+app = FastAPI(lifespan=lifespan)
+
+ConfigDependency = Annotated[SandboxConfig, Depends(get_config)]
+ManagerDependency = Annotated[SandboxManager, Depends(get_manager)]
 
 
 def require_token(
@@ -40,18 +61,17 @@ def require_token(
         )
 
 
-app = FastAPI()
-
-
 @app.get("/health")
-async def health() -> dict[str, bool]:
+async def health(manager: ManagerDependency) -> dict[str, bool]:
     await asyncio.to_thread(manager.client.ping)
     return {"ok": True}
 
 
 @app.post("/sandboxes")
 async def create_sandbox(
-    request: CreateSandboxRequest, _: None = Depends(require_token)
+    request: CreateSandboxRequest,
+    manager: ManagerDependency,
+    _: None = Depends(require_token),
 ) -> CreateSandboxResponse:
     try:
         sandbox_id = await asyncio.to_thread(manager.create, request.job_id)
@@ -72,6 +92,7 @@ async def execute_command(
     sandbox_id: str,
     request: ExecCommandRequest,
     config: ConfigDependency,
+    manager: ManagerDependency,
     _: None = Depends(require_token),
 ) -> ExecCommandResponse:
     try:
@@ -109,7 +130,7 @@ async def execute_command(
 
 @app.get("/sandboxes/{sandbox_id}")
 async def sandbox_status(
-    sandbox_id: str, _: None = Depends(require_token)
+    sandbox_id: str, manager: ManagerDependency, _: None = Depends(require_token)
 ) -> SandboxStatusResponse:
     try:
         container = await asyncio.to_thread(manager.get, sandbox_id)
@@ -122,5 +143,7 @@ async def sandbox_status(
 
 
 @app.delete("/sandboxes/{sandbox_id}")
-async def destroy_sandbox(sandbox_id: str, _: None = Depends(require_token)) -> None:
+async def destroy_sandbox(
+    sandbox_id: str, manager: ManagerDependency, _: None = Depends(require_token)
+) -> None:
     await asyncio.to_thread(manager.destroy, sandbox_id)
