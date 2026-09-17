@@ -2,13 +2,17 @@ import threading
 from datetime import UTC, datetime
 
 import docker
-from docker.errors import NotFound
+from docker.errors import DockerException, NotFound
 from pydantic import BaseModel
 
 from .config import SandboxConfig
 
 MAX_STDOUT_BYTES = 50_000
 MAX_STDERR_BYTES = 20_000
+
+
+class SandboxCapacityError(RuntimeError):
+    """Raised when the provided capacity has been reached"""
 
 
 class ExecOutput(BaseModel):
@@ -24,12 +28,20 @@ class SandboxManager:
         self.client = docker.from_env()
         self._create_lock = threading.Lock()
 
+    @property
+    def sandbox_label(self) -> str:
+        return f"{self.config.sandbox_label_prefix}.sandbox"
+
+    @property
+    def created_at_label(self) -> str:
+        return f"{self.config.sandbox_label_prefix}.created-at"
+
     def _labels(self, job_id: str) -> dict[str, str]:
         prefix = self.config.sandbox_label_prefix
         return {
-            f"{prefix}.sandbox": "true",
+            self.sandbox_label: "true",
             f"{prefix}.job-id": job_id,
-            f"{prefix}.created-at": datetime.now(UTC).isoformat(),
+            self.created_at_label: datetime.now(UTC).isoformat(),
         }
 
     def _ensure_sandbox_network(self) -> None:
@@ -45,28 +57,48 @@ class SandboxManager:
                 self.config.sandbox_network, driver="bridge", check_duplicate=True
             )
 
+    def _is_expired(self, container) -> bool:
+        created_at = container.labels.get(self.created_at_label)
+        if not created_at:
+            # let's flag containers with messed up labels as expired
+            return True
+
+        try:
+            created = datetime.fromisoformat(created_at)
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=UTC)
+        except ValueError:
+            return True
+
+        age = (datetime.now(UTC) - created).total_seconds()
+        return age >= self.config.sandbox_max_lifetime_seconds
+
+    def _remove_stale_sandboxes(self, containers: list) -> list:
+        active = []
+
+        for container in containers:
+            container.reload()
+
+            if container.status != "running" or self._is_expired(container):
+                container.remove(force=True)
+            else:
+                active.append(container)
+
+        return active
+
     def create(self, job_id: str) -> str:
         with self._create_lock:
             self._ensure_sandbox_network()
 
-            active = self.client.containers.list(
+            managed_containers = self.client.containers.list(
                 all=True,
-                filters={"label": f"{self.config.sandbox_label_prefix}.sandbox=true"},
+                filters={"label": f"{self.sandbox_label}=true"},
             )
 
-            # container creation and startup are two separate actions.
-            # if a startup fails, created containers may be kept (in a state like "created", "exited", ...)
-            # we remove these stale contaienrs to not count for the concurrency limit
-            active_copy = active[:]
-            # loop over copy to allow us to remove items from the active list
-            for sandbox in active_copy:
-                sandbox.reload()
-                if sandbox.status != "running":
-                    sandbox.remove(force=True)
-                    active.remove(sandbox)
+            active = self._remove_stale_sandboxes(managed_containers)
 
             if len(active) >= self.config.sandbox_max_concurrent:
-                raise RuntimeError("Maximum concurrent sandbox count reached.")
+                raise SandboxCapacityError("Maximum concurrent sandbox count reached")
 
             container = self.client.containers.create(
                 image=self.config.sandbox_image,
@@ -86,25 +118,25 @@ class SandboxManager:
             )
             try:
                 container.start()
+                if not container.id:
+                    raise DockerException("Docker returned a container without an ID")
+
+                return container.id
             except Exception:
-                # attempt removal in case create succeeded
-                container.remove(force=True)
+                try:
+                    # attempt removal in case create succeeded
+                    container.remove(force=True)
+                except DockerException:
+                    # keep the original creation/startup error
+                    pass
                 raise
-
-            if container.id is None:
-                raise ValueError("Malformed ID-less container")
-
-            return container.id
 
     def get(self, sandbox_id: str):
         try:
             container = self.client.containers.get(sandbox_id)
         except NotFound as exc:
             raise KeyError(sandbox_id) from exc
-        if (
-            container.labels.get(f"{self.config.sandbox_label_prefix}.sandbox")
-            != "true"
-        ):
+        if container.labels.get(self.sandbox_label) != "true":
             raise KeyError(sandbox_id)
         return container
 
@@ -178,6 +210,7 @@ class SandboxManager:
         try:
             container = self.get(sandbox_id)
         except KeyError:
+            # we dont mind the sandbox wasn't found -> destroy operation is intentionally idempotent
             return
         container.remove(force=True)
 
