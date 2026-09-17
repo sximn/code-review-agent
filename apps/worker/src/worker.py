@@ -12,7 +12,7 @@ from redis.exceptions import RedisError, ResponseError
 
 from .agent import PRMetadata, run_agent_review, run_mock_agent_review
 from .config import AppConfig
-from .pull_request import fetch_pr_metadata, uriEncode
+from .repository import fetch_pr_metadata, parse_repository_handle, uriEncode
 from .review_state_client import ReviewStateClient
 from .sandbox_client import SandboxClient
 
@@ -81,9 +81,7 @@ async def review_pull_request(
     if not isinstance(pr_number, int) or pr_number < 1:
         raise ValueError("Missing or invalid pull request ID.")
 
-    owner, name = repository.split("/", maxsplit=1)
-    if not owner or not name:
-        raise ValueError("Received malformed repository handle.")
+    owner, name = parse_repository_handle(repository)
 
     repository_url = f"https://github.com/{uriEncode(owner)}/{uriEncode(name)}.git"
     git_environment = _git_environment(config.github_token)
@@ -148,8 +146,8 @@ async def review_pull_request(
                 raise RuntimeError("Repository is too large after the partial clone.")
 
             for label, revision in (
-                ("Pull request base fetch", metadata["base_sha"]),
-                ("Pull request head fetch", metadata["head_sha"]),
+                ("Pull request base fetch", metadata.base_sha),
+                ("Pull request head fetch", metadata.head_sha),
             ):
                 await _require_command(
                     sandbox,
@@ -162,7 +160,7 @@ async def review_pull_request(
             await _require_command(
                 sandbox,
                 sandbox_id,
-                ["git", "checkout", "--detach", metadata["head_sha"]],
+                ["git", "checkout", "--detach", metadata.head_sha],
                 label="Pull request checkout",
             )
 
@@ -181,9 +179,9 @@ async def review_pull_request(
                 raise RuntimeError("Checked-out repository is too large.")
 
             pr_metadata = PRMetadata(
-                title=metadata["title"],
-                description=metadata["description"],
-                diff=metadata["diff"],
+                title=metadata.title,
+                description=metadata.description,
+                diff=metadata.diff,
             )
             if config.agent_mode == "mock":
                 review = await run_mock_agent_review(pr_metadata)
