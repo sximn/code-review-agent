@@ -16,3 +16,6 @@ wheels/
 !.env.example
 
 .DS_Store
+
+.coverage
+.pytest_cache
