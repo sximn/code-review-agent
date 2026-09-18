@@ -6,6 +6,7 @@ import httpx
 import pytest
 from redis.asyncio import Redis
 from src import worker
+from src.repository import ReviewRequestPayload
 from src.review_state_client import ReviewStateClient
 from src.sandbox_client import SandboxClient
 from src.worker import InvalidJobError, _require_command, process_job, process_message
@@ -156,7 +157,7 @@ class TestProcessJob:
 
         review.assert_called_once_with(
             "job-1",
-            json.loads(self.example_good_payload),
+            ReviewRequestPayload.model_validate_json(self.example_good_payload),
             config,
             state_client,
             github_client,
@@ -277,3 +278,8 @@ class TestProcessMessage:
             github_client,
         )
         redis.xack.assert_not_awaited()
+
+
+# class TestPullRequestReview:
+#     @pytest.fixture
+#     def mock_sandbox_client():
