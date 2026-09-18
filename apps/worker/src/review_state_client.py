@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal, Self
 
@@ -17,13 +18,19 @@ class ReviewStateClient:
     base_url: str
     token: str
     max_attempts: int = 4
+    transport: httpx.AsyncBaseTransport | None = field(default=None, repr=False)
+    sleep: Callable[[float], Awaitable[None]] = field(default=asyncio.sleep, repr=False)
     _client: httpx.AsyncClient = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        if self.max_attempts < 1:
+            raise ValueError("max_attempts must be at least 1")
+
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=10,
             headers={"Authorization": f"Bearer {self.token}"},
+            transport=self.transport,
         )
 
     async def set_state(
@@ -68,7 +75,7 @@ class ReviewStateClient:
                 last_error = exc
 
             if attempt + 1 < self.max_attempts:
-                await asyncio.sleep(0.5 * (2**attempt))
+                await self.sleep(0.5 * (2**attempt))
 
         raise ReviewStateError("Could not persist review state.") from last_error
 
