@@ -9,12 +9,14 @@ class SandboxClient:
     base_url: str
     timeout_seconds: int
     token: str
+    transport: httpx.AsyncBaseTransport | None = field(default=None, repr=False)
     _client: httpx.AsyncClient = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=self.timeout_seconds + 15,
+            transport=self.transport,
         )
 
     @property
