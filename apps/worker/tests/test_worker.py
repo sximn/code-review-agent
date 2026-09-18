@@ -2,11 +2,13 @@ import json
 from typing import ClassVar
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
+from redis.asyncio import Redis
 from src import worker
 from src.review_state_client import ReviewStateClient
 from src.sandbox_client import SandboxClient
-from src.worker import InvalidJobError, _require_command, process_job
+from src.worker import InvalidJobError, _require_command, process_job, process_message
 from tests.conftest import ConfigFactory
 
 
@@ -49,6 +51,13 @@ class TestHelperFunctions:
 
 
 class TestProcessJob:
+    """Tests:
+    - field validation
+    - job type verification with whats configured
+    - payload validation - ensure set_state is called on invalid payload
+    - successfull review_pull_request call on correct fields & payload
+    """
+
     example_good_payload = '{"repository":"owner/repo","pull_request":2}'
     missing_required_fields: ClassVar = [
         {"type": "review", "payload": example_good_payload},
@@ -148,3 +157,119 @@ class TestProcessJob:
             state_client,
             github_client,
         )
+
+
+class TestProcessMessage:
+    """Verifies queue task acknowledgment flow
+    - acknowledges on successful processing
+    - acknowledges on failed because of invalid fields
+    - does not acknowledge on other errors
+    """
+
+    @pytest.fixture
+    def config(self, make_config: ConfigFactory):
+        return make_config(review_job_name="review")
+
+    @pytest.fixture
+    def redis(self, monkeypatch):
+        mocked_redis = AsyncMock(spec=Redis)
+
+        x_ack_call = AsyncMock(return_value=1)
+        monkeypatch.setattr(mocked_redis, "xack", x_ack_call)
+        return mocked_redis
+
+    @pytest.fixture
+    def state_client(self):
+        return AsyncMock(spec=ReviewStateClient)
+
+    @pytest.fixture
+    def github_client(self):
+        return AsyncMock(spec=httpx.AsyncClient)
+
+    @pytest.mark.asyncio
+    async def test_process_message_acknowledges_successful_job(
+        self, monkeypatch, config, redis, state_client, github_client
+    ):
+        """verify that XACK is called after successful process_job"""
+        process_job = AsyncMock(return_value=None)
+        monkeypatch.setattr(worker, "process_job", process_job)
+
+        fields = {
+            "job_id": "job-1",
+            "type": config.review_job_name,
+            "payload": json.dumps({"repository": "owner/repo", "pull_request": 2}),
+        }
+
+        await process_message(
+            redis, config, state_client, github_client, "123-456", fields
+        )
+
+        process_job.assert_awaited_once_with(
+            fields,
+            config,
+            state_client,
+            github_client,
+        )
+        redis.xack.assert_awaited_once_with(
+            config.job_stream,
+            config.group_name,
+            "123-456",
+        )
+
+    @pytest.mark.asyncio
+    async def test_process_message_acknowledges_invalid_job_inputs(
+        self, monkeypatch, config, redis, state_client, github_client
+    ):
+        """verify that XACK is called after invalid job fields are passed"""
+        process_job = AsyncMock(side_effect=InvalidJobError("Unknown job type"))
+        monkeypatch.setattr(worker, "process_job", process_job)
+
+        fields = {
+            "job_id": "job-1",
+            "type": "INVALID-TYPE",
+            "payload": json.dumps({"repository": "owner/repo", "pull_request": 2}),
+        }
+
+        await process_message(
+            redis, config, state_client, github_client, "123-456", fields
+        )
+
+        process_job.assert_awaited_once_with(
+            fields,
+            config,
+            state_client,
+            github_client,
+        )
+        redis.xack.assert_awaited_once_with(
+            config.job_stream,
+            config.group_name,
+            "123-456",
+        )
+
+    @pytest.mark.asyncio
+    async def test_process_message_does_not_acknowledge_recoverable_error(
+        self, monkeypatch, config, redis, state_client, github_client
+    ):
+        """verify that XACK is NOT called after other error, which we assume can be recovered.
+        This covers other errors that `review_pull_request` might throw when a service is unavailable.
+        """
+        process_job = AsyncMock(side_effect=RuntimeError("Service unavailable"))
+        monkeypatch.setattr(worker, "process_job", process_job)
+
+        fields = {
+            "job_id": "job-1",
+            "type": "INVALID-TYPE",
+            "payload": json.dumps({"repository": "owner/repo", "pull_request": 2}),
+        }
+
+        await process_message(
+            redis, config, state_client, github_client, "123-456", fields
+        )
+
+        process_job.assert_awaited_once_with(
+            fields,
+            config,
+            state_client,
+            github_client,
+        )
+        redis.xack.assert_not_awaited()
