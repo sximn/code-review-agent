@@ -5,6 +5,7 @@ from src.repository import (
     InvalidRepositoryHandle,
     PullRequestMetadata,
     _github_get,
+    _validate_token,
     fetch_pr_metadata,
     parse_repository_handle,
     uriEncode,
@@ -52,6 +53,36 @@ def test_parse_repository_handle_rejects_invalid_values(repository):
 )
 def test_uri_encode(value, expected):
     assert uriEncode(value) == expected
+
+
+@pytest.mark.asyncio
+async def test_validate_token_success():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, request=request)
+
+    await _validate_token(
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)), token="token"
+    )
+
+
+@pytest.mark.parametrize(
+    "status_code,error,error_match",
+    [
+        (401, GitHubError, "invalid"),
+        (403, GitHubError, "rejected"),
+        (400, httpx.HTTPStatusError, None),
+    ],
+)
+@pytest.mark.asyncio
+async def test_validate_token_raises_on_bad_status(status_code, error, error_match):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code=status_code, request=request)
+
+    with pytest.raises(error, match=error_match):
+        await _validate_token(
+            client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+            token="token",
+        )
 
 
 @pytest.mark.asyncio
