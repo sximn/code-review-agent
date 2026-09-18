@@ -75,6 +75,7 @@ async def review_pull_request(
     job_id: str,
     payload: ReviewRequestPayload,
     config: AppConfig,
+    sandbox_client: SandboxClient,
     state_client: ReviewStateClient,
     github_client: httpx.AsyncClient,
 ) -> None:
@@ -93,12 +94,6 @@ async def review_pull_request(
         )
         return
 
-    sandbox = SandboxClient(
-        config.sandbox_controller_url,
-        config.command_timeout_seconds,
-        config.sandbox_controller_token,
-    )
-
     try:
         async with asyncio.timeout(config.job_timeout_seconds):
             metadata = await fetch_pr_metadata(
@@ -107,10 +102,10 @@ async def review_pull_request(
                 config.github_token,
             )
 
-            sandbox_id = await sandbox.create(job_id)
+            sandbox_id = await sandbox_client.create(job_id)
 
             await _require_command(
-                sandbox,
+                sandbox_client,
                 sandbox_id,
                 [
                     "git",
@@ -126,7 +121,7 @@ async def review_pull_request(
             )
 
             size = await _require_command(
-                sandbox,
+                sandbox_client,
                 sandbox_id,
                 ["du", "-sb", "/workspace/repo"],
                 "/workspace",
@@ -144,7 +139,7 @@ async def review_pull_request(
                 ("Pull request head fetch", metadata.head_sha),
             ):
                 await _require_command(
-                    sandbox,
+                    sandbox_client,
                     sandbox_id,
                     ["git", "fetch", "--no-tags", "--depth=1", "origin", revision],
                     env=git_environment,
@@ -152,14 +147,14 @@ async def review_pull_request(
                 )
 
             await _require_command(
-                sandbox,
+                sandbox_client,
                 sandbox_id,
                 ["git", "checkout", "--detach", metadata.head_sha],
                 label="Pull request checkout",
             )
 
             checkout_size = await _require_command(
-                sandbox,
+                sandbox_client,
                 sandbox_id,
                 ["du", "-sb", "/workspace/repo"],
                 "/workspace",
@@ -187,7 +182,7 @@ async def review_pull_request(
                     config.model,
                     config.openai_api_key,
                     config.max_steps,
-                    sandbox,
+                    sandbox_client,
                     sandbox_id,
                 )
 
@@ -203,10 +198,10 @@ async def review_pull_request(
     finally:
         if sandbox_id:
             try:
-                await sandbox.destroy(sandbox_id)
+                await sandbox_client.destroy(sandbox_id)
             except Exception:
                 logger.exception("Failed to destroy sandbox %s", sandbox_id)
-        await sandbox.close()
+        await sandbox_client.close()
 
     if failure is not None:
         await state_client.set_state(
@@ -272,7 +267,14 @@ async def process_job(
         )
         return
 
-    await review_pull_request(job_id, payload, config, state_client, github_client)
+    sandbox = SandboxClient(
+        config.sandbox_controller_url,
+        config.command_timeout_seconds,
+        config.sandbox_controller_token,
+    )
+    await review_pull_request(
+        job_id, payload, config, sandbox, state_client, github_client
+    )
 
 
 async def process_message(
