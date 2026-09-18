@@ -1,15 +1,21 @@
 import json
+from types import SimpleNamespace
 from typing import ClassVar
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock, call
 
 import httpx
 import pytest
 from redis.asyncio import Redis
 from src import worker
-from src.repository import ReviewRequestPayload
 from src.review_state_client import ReviewStateClient
 from src.sandbox_client import SandboxClient
-from src.worker import InvalidJobError, _require_command, process_job, process_message
+from src.worker import (
+    InvalidJobError,
+    _require_command,
+    process_job,
+    process_message,
+    review_pull_request,
+)
 from tests.conftest import ConfigFactory
 
 
@@ -155,14 +161,6 @@ class TestProcessJob:
             github_client,
         )
 
-        review.assert_called_once_with(
-            "job-1",
-            ReviewRequestPayload.model_validate_json(self.example_good_payload),
-            config,
-            state_client,
-            github_client,
-        )
-
 
 class TestProcessMessage:
     """Verifies queue task acknowledgment flow
@@ -280,6 +278,488 @@ class TestProcessMessage:
         redis.xack.assert_not_awaited()
 
 
-# class TestPullRequestReview:
-#     @pytest.fixture
-#     def mock_sandbox_client():
+class TestPullRequestReview:
+    @pytest.fixture
+    def state_client(self):
+        client = AsyncMock(spec=ReviewStateClient)
+
+        async def set_state(job_id, status, **kwargs):
+            return status
+
+        client.set_state.side_effect = set_state
+        return client
+
+    @pytest.fixture
+    def sandbox_client(self):
+        client = Mock(spec=SandboxClient)
+
+        repo_sizes = iter([100, 200])
+
+        client.create.return_value = "sandbox-123"
+
+        async def exec_command(
+            sandbox_id,
+            command,
+            cwd="/workspace/repo",
+            env=None,
+        ):
+            if command[:2] == ["du", "-sb"]:
+                size = next(repo_sizes)
+                return {
+                    "exit_code": 0,
+                    "stdout": f"{size}\t/workspace/repo\n",
+                    "stderr": "",
+                }
+
+            return {
+                "exit_code": 0,
+                "stdout": "",
+                "stderr": "",
+            }
+
+        client.exec.side_effect = exec_command
+        client.destroy.return_value = None
+        client.close.return_value = None
+
+        return client
+
+    @pytest.fixture
+    def payload(self):
+        return SimpleNamespace(
+            repository_owner="sximn",
+            repository_name="code-review-agent",
+            repository_handle="sximn/code-review-agent",
+            pull_request_number=42,
+        )
+
+    @pytest.fixture
+    def metadata(self):
+        return SimpleNamespace(
+            title="Improve widgets",
+            description="A useful PR",
+            diff="diff --git ...",
+            base_sha="base123",
+            head_sha="head456",
+        )
+
+    @pytest.fixture
+    def github_client(self):
+        return AsyncMock(spec=httpx.AsyncClient)
+
+    def assert_failed(self, state_client, message: str) -> None:
+        assert state_client.set_state.await_args_list == [
+            call("job-1", "running"),
+            call("job-1", "failed", error=message),
+        ]
+
+    # "happy path"
+    @pytest.mark.asyncio
+    async def test_successful_review(
+        self,
+        monkeypatch,
+        payload,
+        config,
+        metadata,
+        state_client,
+        sandbox_client,
+        github_client,
+    ):
+
+        fetch_metadata = AsyncMock(return_value=metadata)
+        review_result = Mock()
+        review_result.model_dump.return_value = {
+            "summary": "Looks good",
+            "findings": [],
+        }
+        run_review = AsyncMock(return_value=review_result)
+
+        monkeypatch.setattr(worker, "fetch_pr_metadata", fetch_metadata)
+        monkeypatch.setattr(worker, "run_mock_agent_review", run_review)
+
+        await review_pull_request(
+            "job-1",
+            payload,
+            config,
+            sandbox_client,
+            state_client,
+            github_client,
+        )
+
+        assert state_client.set_state.await_args_list == [
+            call("job-1", "running"),
+            call(
+                "job-1",
+                "finished",
+                result={
+                    "summary": "Looks good",
+                    "findings": [],
+                },
+            ),
+        ]
+
+        sandbox_client.create.assert_awaited_once_with("job-1")
+        sandbox_client.destroy.assert_awaited_once_with("sandbox-123")
+        sandbox_client.close.assert_awaited_once_with()
+
+        commands = [
+            invocation.args[1] for invocation in sandbox_client.exec.await_args_list
+        ]
+
+        assert commands == [
+            [
+                "git",
+                "clone",
+                "--filter=blob:none",
+                "--no-checkout",
+                "https://github.com/sximn/code-review-agent.git",
+                "/workspace/repo",
+            ],
+            ["du", "-sb", "/workspace/repo"],
+            [
+                "git",
+                "fetch",
+                "--no-tags",
+                "--depth=1",
+                "origin",
+                "base123",
+            ],
+            [
+                "git",
+                "fetch",
+                "--no-tags",
+                "--depth=1",
+                "origin",
+                "head456",
+            ],
+            ["git", "checkout", "--detach", "head456"],
+            ["du", "-sb", "/workspace/repo"],
+        ]
+
+        fetch_metadata.assert_awaited_once_with(
+            github_client,
+            payload,
+            config.github_token,
+        )
+        run_review.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_fetch_metadata_failure(
+        self,
+        monkeypatch,
+        payload,
+        config,
+        state_client,
+        sandbox_client,
+        github_client,
+    ):
+        fetch_metadata = AsyncMock(side_effect=RuntimeError("GitHub unavailable"))
+        monkeypatch.setattr(
+            worker,
+            "fetch_pr_metadata",
+            fetch_metadata,
+        )
+
+        await review_pull_request(
+            "job-1",
+            payload,
+            config,
+            sandbox_client,
+            state_client,
+            github_client,
+        )
+
+        self.assert_failed(state_client, "GitHub unavailable")
+
+        sandbox_client.create.assert_not_awaited()
+        sandbox_client.destroy.assert_not_awaited()
+        sandbox_client.close.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_sandbox_creation_failure(
+        self,
+        monkeypatch,
+        payload,
+        config,
+        metadata,
+        state_client,
+        sandbox_client,
+        github_client,
+    ):
+        monkeypatch.setattr(
+            worker,
+            "fetch_pr_metadata",
+            AsyncMock(return_value=metadata),
+        )
+        sandbox_client.create.side_effect = RuntimeError("Sandbox service unavailable")
+
+        await review_pull_request(
+            "job-1",
+            payload,
+            config,
+            sandbox_client,
+            state_client,
+            github_client,
+        )
+
+        self.assert_failed(state_client, "Sandbox service unavailable")
+
+        sandbox_client.destroy.assert_not_awaited()
+        sandbox_client.close.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_checkout_failure(
+        self,
+        monkeypatch,
+        payload,
+        config,
+        metadata,
+        state_client,
+        sandbox_client,
+        github_client,
+    ):
+        monkeypatch.setattr(
+            worker,
+            "fetch_pr_metadata",
+            AsyncMock(return_value=metadata),
+        )
+
+        async def exec_command(
+            sandbox_id,
+            command,
+            cwd="/workspace/repo",
+            env=None,
+        ):
+            if command[:2] == ["du", "-sb"]:
+                return {
+                    "exit_code": 0,
+                    "stdout": "100\t/workspace/repo\n",
+                    "stderr": "",
+                }
+
+            if command[:3] == ["git", "checkout", "--detach"]:
+                return {
+                    "exit_code": 1,
+                    "stdout": "",
+                    "stderr": "invalid revision",
+                }
+
+            return {
+                "exit_code": 0,
+                "stdout": "",
+                "stderr": "",
+            }
+
+        sandbox_client.exec.side_effect = exec_command
+        run_review = AsyncMock()
+        monkeypatch.setattr(
+            worker,
+            "run_mock_agent_review",
+            run_review,
+        )
+
+        await review_pull_request(
+            "job-1",
+            payload,
+            config,
+            sandbox_client,
+            state_client,
+            github_client,
+        )
+
+        self.assert_failed(
+            state_client,
+            "Pull request checkout failed: invalid revision",
+        )
+
+        sandbox_client.destroy.assert_awaited_once_with("sandbox-123")
+        sandbox_client.close.assert_awaited_once_with()
+        run_review.assert_not_awaited()
+
+    @pytest.mark.parametrize(
+        "failed_command,expected_error",
+        [
+            (
+                ["git", "clone"],
+                "Repository clone failed: simulated failure",
+            ),
+            (
+                ["git", "fetch"],
+                "Pull request base fetch failed: simulated failure",
+            ),
+            (
+                ["git", "checkout"],
+                "Pull request checkout failed: simulated failure",
+            ),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_git_command_failure(
+        self,
+        monkeypatch,
+        failed_command,
+        expected_error,
+        payload,
+        config,
+        metadata,
+        sandbox_client,
+        state_client,
+        github_client,
+    ):
+        monkeypatch.setattr(
+            worker,
+            "fetch_pr_metadata",
+            AsyncMock(return_value=metadata),
+        )
+
+        async def exec_command(
+            sandbox_id,
+            command,
+            cwd="/workspace/repo",
+            env=None,
+        ):
+            if command[: len(failed_command)] == failed_command:
+                return {
+                    "exit_code": 1,
+                    "stdout": "",
+                    "stderr": "simulated failure",
+                }
+
+            # make the `du` command pass
+            if command[:2] == ["du", "-sb"]:
+                return {
+                    "exit_code": 0,
+                    "stdout": "100\t/workspace/repo\n",
+                    "stderr": "",
+                }
+
+            return {
+                "exit_code": 0,
+                "stdout": "",
+                "stderr": "",
+            }
+
+        sandbox_client.exec.side_effect = exec_command
+
+        await review_pull_request(
+            "job-1",
+            payload,
+            config,
+            sandbox_client,
+            state_client,
+            github_client,
+        )
+
+        self.assert_failed(state_client, expected_error)
+        sandbox_client.destroy.assert_awaited_once_with("sandbox-123")
+        sandbox_client.close.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_agent_failure(
+        self,
+        monkeypatch,
+        payload,
+        config,
+        metadata,
+        state_client,
+        sandbox_client,
+        github_client,
+    ):
+        monkeypatch.setattr(
+            worker,
+            "fetch_pr_metadata",
+            AsyncMock(return_value=metadata),
+        )
+        monkeypatch.setattr(
+            worker,
+            "run_mock_agent_review",
+            AsyncMock(side_effect=RuntimeError("Agent crashed")),
+        )
+
+        await review_pull_request(
+            "job-1",
+            payload,
+            config,
+            sandbox_client,
+            state_client,
+            github_client,
+        )
+
+        self.assert_failed(state_client, "Agent crashed")
+        sandbox_client.destroy.assert_awaited_once_with("sandbox-123")
+        sandbox_client.close.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_timeout_failure(
+        self,
+        monkeypatch,
+        payload,
+        config,
+        state_client,
+        sandbox_client,
+        github_client,
+    ):
+        monkeypatch.setattr(
+            worker,
+            "fetch_pr_metadata",
+            AsyncMock(side_effect=TimeoutError),
+        )
+
+        await review_pull_request(
+            "job-1",
+            payload,
+            config,
+            sandbox_client,
+            state_client,
+            github_client,
+        )
+
+        self.assert_failed(
+            state_client,
+            (f"The review exceeded the {config.job_timeout_seconds}-second deadline."),
+        )
+        sandbox_client.destroy.assert_not_awaited()
+        sandbox_client.close.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_destroy_failure_does_not_hide_result(
+        self,
+        monkeypatch,
+        payload,
+        config,
+        metadata,
+        state_client,
+        sandbox_client,
+        github_client,
+    ):
+        monkeypatch.setattr(
+            worker,
+            "fetch_pr_metadata",
+            AsyncMock(return_value=metadata),
+        )
+
+        review = Mock()
+        review.model_dump.return_value = {"summary": "OK"}
+        monkeypatch.setattr(
+            worker,
+            "run_mock_agent_review",
+            AsyncMock(return_value=review),
+        )
+
+        sandbox_client.destroy.side_effect = RuntimeError("Destroy failed")
+
+        await review_pull_request(
+            "job-1",
+            payload,
+            config,
+            sandbox_client,
+            state_client,
+            github_client,
+        )
+
+        assert state_client.set_state.await_args_list[-1] == call(
+            "job-1",
+            "finished",
+            result={"summary": "OK"},
+        )
+        # successfully closed even if destroy fails
+        sandbox_client.close.assert_awaited_once_with()
