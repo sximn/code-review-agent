@@ -410,7 +410,8 @@ async def run_worker() -> None:
         ):
             await ensure_consumer_group(redis, config)
             logger.info(
-                "Worker started stream=%s group=%s consumer=%s concurrency=%s",
+                "Worker started in %s mode | stream=%s group=%s consumer=%s concurrency=%s",
+                config.agent_mode.upper(),
                 config.job_stream,
                 config.group_name,
                 CONSUMER_NAME,
