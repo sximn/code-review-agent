@@ -1,45 +1,71 @@
+from typing import Any
+
 import httpx
 import pytest
+from pydantic import ValidationError
 from src.repository import (
     GitHubError,
-    InvalidRepositoryHandle,
     PullRequestMetadata,
+    ReviewRequestPayload,
     _github_get,
     _validate_token,
     fetch_pr_metadata,
-    parse_repository_handle,
     uriEncode,
 )
 
 parse_handle_testdata = [
-    ("sximn/code-review-agent", ("sximn", "code-review-agent")),
-    ("random/name.with-dots", ("random", "name.with-dots")),
+    (
+        {"repository": "sximn/code-review-agent", "pull_request": 2},
+        {
+            "repository_handle": "sximn/code-review-agent",
+            "pull_request_number": 2,
+            "repository_owner": "sximn",
+            "repository_name": "code-review-agent",
+        },
+    ),
+    (
+        {"repository": "random/name.with-dots", "pull_request": 42},
+        {
+            "repository_handle": "random/name.with-dots",
+            "pull_request_number": 42,
+            "repository_owner": "random",
+            "repository_name": "name.with-dots",
+        },
+    ),
 ]
 
 
-@pytest.mark.parametrize("repository,expected", parse_handle_testdata)
-def test_parse_repository_handle(repository: str, expected: tuple[str, str]):
-    computed = parse_repository_handle(repository)
-
-    assert computed == expected
+@pytest.mark.parametrize("raw_payload,expected", parse_handle_testdata)
+def test_parse_review_request_payload_passes(
+    raw_payload: dict[str, Any], expected: dict[str, Any]
+):
+    computed = ReviewRequestPayload.model_validate(raw_payload)
+    computed.model_dump()
+    assert computed.model_dump() == expected
 
 
 @pytest.mark.parametrize(
-    "repository",
+    "raw_payload",
     [
-        "",
-        "repository",
-        "/repository",
-        "owner/",
-        "/",
-        "owner/repository/extra",
-        " owner/repository",
-        "owner/repository ",
+        # invalid `repository` values
+        {"repository": "", "pull_request": 2},
+        {"repository": "repo", "pull_request": 2},
+        {"repository": "/repository", "pull_request": 2},
+        {"repository": "owner/", "pull_request": 2},
+        {"repository": "/", "pull_request": 2},
+        {"repository": "owner/repository/extra", "pull_request": 2},
+        {"repository": " owner/repository", "pull_request": 2},
+        {"repository": "owner/repository ", "pull_request": 2},
+        # invalid `pull_request` values
+        {"repository": "sximn/code-review-agent ", "pull_request": 0},
+        {"repository": "sximn/code-review-agent ", "pull_request": ""},
+        {"repository": "sximn/code-review-agent ", "pull_request": "2"},
+        {"repository": "sximn/code-review-agent ", "pull_request": "blabla"},
     ],
 )
-def test_parse_repository_handle_rejects_invalid_values(repository):
-    with pytest.raises(InvalidRepositoryHandle):
-        parse_repository_handle(repository)
+def test_parse_review_request_payload_rejects_invalid_values(raw_payload):
+    with pytest.raises(ValidationError):
+        _ = ReviewRequestPayload.model_validate(raw_payload)
 
 
 @pytest.mark.parametrize(
@@ -145,8 +171,9 @@ async def test_fetch_pr_metadata():
     async with httpx.AsyncClient(transport=transport) as client:
         result = await fetch_pr_metadata(
             client,
-            repository=REPO,
-            pr_number=PR,
+            payload=ReviewRequestPayload.model_validate(
+                {"repository": REPO, "pull_request": PR}
+            ),
         )
 
     assert result == PullRequestMetadata(

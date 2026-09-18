@@ -7,12 +7,17 @@ import socket
 from typing import Any, TypeAlias, cast
 
 import httpx
+from pydantic import ValidationError
 from redis.asyncio import Redis
 from redis.exceptions import RedisError, ResponseError
 
 from .agent import PRMetadata, run_agent_review, run_mock_agent_review
 from .config import AppConfig
-from .repository import fetch_pr_metadata, parse_repository_handle, uriEncode
+from .repository import (
+    ReviewRequestPayload,
+    fetch_pr_metadata,
+    uriEncode,
+)
 from .review_state_client import ReviewStateClient
 from .sandbox_client import SandboxClient
 
@@ -68,22 +73,12 @@ async def _require_command(
 
 async def review_pull_request(
     job_id: str,
-    payload: dict[str, Any],
+    payload: ReviewRequestPayload,
     config: AppConfig,
     state_client: ReviewStateClient,
     github_client: httpx.AsyncClient,
 ) -> None:
-    repository = payload.get("repository")
-    pr_number = payload.get("pull_request")
-
-    if not isinstance(repository, str) or repository.count("/") != 1:
-        raise ValueError("Received malformed repository handle.")
-    if not isinstance(pr_number, int) or pr_number < 1:
-        raise ValueError("Missing or invalid pull request ID.")
-
-    owner, name = parse_repository_handle(repository)
-
-    repository_url = f"https://github.com/{uriEncode(owner)}/{uriEncode(name)}.git"
+    repository_url = f"https://github.com/{uriEncode(payload.repository_owner)}/{uriEncode(payload.repository_name)}.git"
     git_environment = _git_environment(config.github_token)
     sandbox_id: str | None = None
     result: dict[str, Any] | None = None
@@ -108,8 +103,7 @@ async def review_pull_request(
         async with asyncio.timeout(config.job_timeout_seconds):
             metadata = await fetch_pr_metadata(
                 github_client,
-                repository,
-                pr_number,
+                payload,
                 config.github_token,
             )
 
@@ -255,7 +249,7 @@ async def process_job(
     try:
         job_id = fields["job_id"]
         job_type = fields["type"]
-        payload = json.loads(fields["payload"])
+        raw_payload = json.loads(fields["payload"])
     except (KeyError, json.JSONDecodeError) as exc:
         raise InvalidJobError(
             "Job message is missing required fields or JSON."
@@ -265,17 +259,12 @@ async def process_job(
 
     if job_type != config.review_job_name:
         raise InvalidJobError(f"Unknown job type: {job_type}")
-    if not isinstance(payload, dict):
+    if not isinstance(raw_payload, dict):
         raise InvalidJobError("Job payload must be a JSON object.")
 
-    repository = payload.get("repository")
-    pr_number = payload.get("pull_request")
-    if (
-        not isinstance(repository, str)
-        or repository.count("/") != 1
-        or not isinstance(pr_number, int)
-        or pr_number < 1
-    ):
+    try:
+        payload = ReviewRequestPayload.model_validate(raw_payload)
+    except ValidationError:
         await state_client.set_state(
             job_id,
             "failed",
