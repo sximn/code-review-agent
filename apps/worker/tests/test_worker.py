@@ -17,6 +17,10 @@ class TestHelperFunctions:
     def sandbox_client(self):
         return AsyncMock(SandboxClient)
 
+    def test_config_raises_on_missing_key_during_live_mode(self, make_config):
+        with pytest.raises(ValueError):
+            _ = make_config(agent_mode="live", openai_api_key=None)
+
     @pytest.mark.asyncio
     async def test_require_command_raises_on_stderr(self, sandbox_client):
         sandbox_client.exec = AsyncMock(

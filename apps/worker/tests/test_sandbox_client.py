@@ -30,3 +30,35 @@ async def test_exec_sends_expected_request() -> None:
         )
 
     assert result == {"exit_code": 0}
+
+
+@pytest.mark.asyncio
+async def test_destroy_ignores_404() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, request=request)
+
+    async with SandboxClient(
+        base_url="https://sandbox.test",
+        timeout_seconds=30,
+        token="secret",
+        transport=httpx.MockTransport(handler),
+    ) as client:
+        result = await client.destroy("sandbox-1")
+
+    assert result is None
+
+
+@pytest.mark.parametrize("status_code", [400, 503])
+@pytest.mark.asyncio
+async def test_destroy_raises_for_other_errors(status_code: int) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code, request=request)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        async with SandboxClient(
+            base_url="https://sandbox.test",
+            timeout_seconds=30,
+            token="secret",
+            transport=httpx.MockTransport(handler),
+        ) as client:
+            await client.destroy("sandbox-1")
