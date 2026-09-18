@@ -77,7 +77,10 @@ async def test_fetch_pr_metadata():
     REPO = "sximn/code-review-agent"
     PR = 2
 
+    requests_called: list[httpx.Request] = []
+
     def handler(request: httpx.Request) -> httpx.Response:
+        requests_called.append(request)
 
         if request.url.path == f"/repos/{REPO}":
             return httpx.Response(status_code=200, json={"private": False})
@@ -115,13 +118,15 @@ async def test_fetch_pr_metadata():
             pr_number=PR,
         )
 
-        assert result == PullRequestMetadata(
-            repository=REPO,
-            pr_number=PR,
-            visibility="public",
-            title="Cool change",
-            description="",
-            diff="diff --git a/README.md b/README.md",
-            base_sha="base123",
-            head_sha="head456",
-        )
+    assert result == PullRequestMetadata(
+        repository=REPO,
+        pr_number=PR,
+        visibility="public",
+        title="Cool change",
+        description="",
+        diff="diff --git a/README.md b/README.md",
+        base_sha="base123",
+        head_sha="head456",
+    )
+
+    assert len(requests_called) == 3
