@@ -24,6 +24,10 @@ jobs:
           cache: true
           require-lockfile: true
 
+      - name: Use example env file
+        run: |
+          cp .env.example .env
+
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
