@@ -1,4 +1,7 @@
 {
+  "files.associations": {
+    "**/apps/web/**/*.css": "tailwindcss"
+  },
   "python-envs.pythonProjects": [
     {
       "path": "apps/worker",
