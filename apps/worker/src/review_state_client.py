@@ -40,12 +40,25 @@ class ReviewStateClient:
         *,
         result: dict[str, Any] | None = None,
         error: str | None = None,
+        usage: dict[str, Any] | None = None,
+        cost: dict[str, Any] | None = None,
     ) -> StoredReviewStatus:
-        payload: dict[str, Any] = {"reviewId": review_id, "status": status}
+        payload: dict[str, Any] = {
+            "reviewId": review_id,
+            "status": status,
+        }
+
         if result is not None:
             payload["result"] = result
+
         if error is not None:
             payload["error"] = error
+
+        if usage is not None:
+            payload["usage"] = usage
+
+        if cost is not None:
+            payload["cost"] = cost
 
         last_error: Exception | None = None
         for attempt in range(self.max_attempts):

@@ -1,5 +1,5 @@
 import json
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
@@ -10,38 +10,10 @@ from openai.types.chat import (
 from openai.types.chat.completion_create_params import (
     CompletionCreateParamsNonStreaming,
 )
-from pydantic import BaseModel, ConfigDict, Field
 
-from .sandbox_client import SandboxClient
-
-
-class PRMetadata(BaseModel):
-    title: str
-    description: str
-    diff: str
-
-
-class Finding(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    category: Literal["quality", "performance", "security"]
-    severity: Literal["critical", "high", "medium", "low"]
-    title: str
-    description: str
-    file: str
-    line_start: int | None
-    line_end: int | None
-    evidence: str
-    recommendation: str
-    confidence: float = Field(ge=0, le=1)
-
-
-class Review(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    findings: list[Finding]
-    approval_granted: bool
-
+from ..sandbox_client import SandboxClient
+from .schema import PRMetadata, Review
+from .usage import UsageAccumulator, record_chat_completion_usage
 
 SYSTEM_PROMPT = """You are an expert software code-review agent.
 
@@ -346,8 +318,10 @@ async def run_agent_review(
     model: str,
     api_key: str,
     max_steps: int,
+    *,
     sandbox: SandboxClient | None = None,
     sandbox_id: str | None = None,
+    usage_accumulator: UsageAccumulator,
 ) -> Review:
     async with AsyncOpenAI(api_key=api_key) as client:
         return await _run_agent_review(
@@ -355,8 +329,9 @@ async def run_agent_review(
             pr_metadata,
             model,
             max_steps,
-            sandbox,
-            sandbox_id,
+            sandbox=sandbox,
+            sandbox_id=sandbox_id,
+            usage_accumulator=usage_accumulator,
         )
 
 
@@ -365,8 +340,10 @@ async def _run_agent_review(
     pr_metadata: PRMetadata,
     model: str,
     max_steps: int,
+    *,
     sandbox: SandboxClient | None,
     sandbox_id: str | None,
+    usage_accumulator: UsageAccumulator,
 ) -> Review:
     messages: list[ChatCompletionMessageParam] = [
         {
@@ -410,6 +387,10 @@ async def _run_agent_review(
             request.update(tools=[SANDBOX_TOOL], tool_choice="auto")
 
         response = await client.chat.completions.create(**request)
+
+        # record usage before parsing/validating so the usage survives
+        record_chat_completion_usage(accumulator=usage_accumulator, response=response)
+
         message = response.choices[0].message
         assistant_message = cast(
             ChatCompletionAssistantMessageParam,
