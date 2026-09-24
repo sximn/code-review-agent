@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+const count = z.int().nonnegative();
+
+const moneyAmountString = z
+  .string()
+  .regex(/^\d+(?:\.\d+)?$/)
+  .refine((val) => Number.parseFloat(val) > 0, {
+    message: "Money amount must be greater than 0",
+  });
+
 export const findingSchema = z
   .object({
     category: z.enum(["quality", "performance", "security"]),
@@ -22,6 +31,38 @@ export const reviewResultSchema = z
   })
   .strict();
 
+export const reviewCostSchema = z.object({
+  status: z.enum([
+    "estimated",
+    "unsupported-model",
+    "usage-unavailable",
+    "not-applicable",
+  ]),
+  estimatedUsd: moneyAmountString,
+  pricingVersion: z.iso.date(),
+  partial: z.boolean(),
+});
+
+export const modelUsageSchema = z.object({
+  model: z.string(),
+  requestCount: count,
+  inputTokens: count,
+  cachedInputTokens: count,
+  outputTokens: count,
+  reasoningTokens: count,
+});
+
+export const reviewUsageSchema = z.object({
+  provider: z.string(),
+  requestCount: count,
+  inputTokens: count,
+  cachedInputTokens: count,
+  outputTokens: count,
+  reasoningTokens: count,
+  totalTokens: count,
+  models: z.array(modelUsageSchema),
+});
+
 export const reviewStateSchema = z.discriminatedUnion("status", [
   z
     .object({
@@ -35,6 +76,8 @@ export const reviewStateSchema = z.discriminatedUnion("status", [
       reviewId: z.uuid(),
       status: z.literal("finished"),
       result: reviewResultSchema,
+      usage: reviewUsageSchema,
+      cost: reviewCostSchema,
     })
     .strict(),
 
@@ -43,6 +86,8 @@ export const reviewStateSchema = z.discriminatedUnion("status", [
       reviewId: z.uuid(),
       status: z.literal("failed"),
       error: z.string().min(1).max(2000),
+      usage: reviewUsageSchema,
+      cost: reviewCostSchema,
     })
     .strict(),
 ]);
