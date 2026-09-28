@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/drizzle";
-import { repository, review } from "@/db/schema";
+import { repository, review, reviewUsage } from "@/db/schema";
 
 export type ConnectedRepository = {
   id: string;
@@ -128,9 +128,13 @@ export async function getRepositoryReviews(
       finishedAt: review.finishedAt,
       updatedAt: review.updatedAt,
       createdAt: review.createdAt,
+      usage: {
+        ...reviewUsage,
+      },
     })
     .from(review)
     .innerJoin(repository, eq(review.repositoryId, repository.id))
+    .leftJoin(reviewUsage, eq(reviewUsage.reviewId, review.id))
     .where(
       and(
         eq(repository.userId, userId),

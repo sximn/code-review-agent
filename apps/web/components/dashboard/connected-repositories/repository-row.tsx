@@ -22,6 +22,7 @@ import {
   reviewsResponseSchema,
   type ReviewsResponse,
   type RepositoryReview,
+  ReviewUsageInternal,
 } from "@/lib/contracts/review";
 import { Button } from "@/components/ui/button";
 import z from "zod";
@@ -31,6 +32,10 @@ const PULL_REQUESTS_PER_PAGE = 25;
 type PullRequestsPage = {
   pullRequests: PullRequest[];
   nextPage: number | null;
+};
+
+type RepositoryReviewWithUsage = RepositoryReview & {
+  usage: ReviewUsageInternal | null;
 };
 
 async function fetchPullRequests({
@@ -142,7 +147,19 @@ function formatLocation(
   return `${file}:${lineStart}`;
 }
 
-function ReviewDetails({ review }: { review: RepositoryReview | undefined }) {
+function EstimatedReviewUsage({ usage }: { usage: ReviewUsageInternal }) {
+  return (
+    <span className="rounded-xl border border-border">
+      estimated cost: ${usage.estimatedCostUsd}
+    </span>
+  );
+}
+
+function ReviewDetails({
+  review,
+}: {
+  review: RepositoryReviewWithUsage | undefined;
+}) {
   if (!review) {
     return null;
   }
@@ -185,6 +202,8 @@ function ReviewDetails({ review }: { review: RepositoryReview | undefined }) {
         <p className="mt-1 text-xs wrap-break-word whitespace-pre-wrap text-muted-foreground">
           {review.error ?? "The review failed without an error message."}
         </p>
+
+        {review.usage && <EstimatedReviewUsage usage={review.usage} />}
       </div>
     );
   }
@@ -196,6 +215,7 @@ function ReviewDetails({ review }: { review: RepositoryReview | undefined }) {
         className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300"
       >
         The review finished, but no result was returned.
+        {review.usage && <EstimatedReviewUsage usage={review.usage} />}
       </div>
     );
   }
@@ -225,6 +245,8 @@ function ReviewDetails({ review }: { review: RepositoryReview | undefined }) {
           {findings.length} {findings.length === 1 ? "finding" : "findings"}
         </span>
       </div>
+
+      {review.usage && <EstimatedReviewUsage usage={review.usage} />}
 
       {findings.length === 0 ? (
         <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
@@ -351,7 +373,10 @@ export function RepositoryRow({
         ["repository-reviews", repo.id],
         (current) => ({
           reviews: [
-            createdReview,
+            {
+              ...createdReview,
+              usage: null,
+            },
             ...(current?.reviews.filter(
               (review) => review.id !== createdReview.id,
             ) ?? []),

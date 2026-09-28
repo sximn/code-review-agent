@@ -120,9 +120,27 @@ export const repositoryReviewSchema = z
   })
   .strict();
 
+export const reviewUsageInternalSchema = z.object({
+  id: z.uuid(),
+  reviewId: z.uuid(),
+  requestCount: count,
+  responsesWithUsage: count,
+  inputTokens: count,
+  cachedInputTokens: count,
+  cacheWriteTokens: count,
+  outputTokens: count,
+  reasoningTokens: count,
+  totalTokens: count,
+  estimatedCostUsd: moneyAmountString,
+});
+
 export const reviewsResponseSchema = z
   .object({
-    reviews: z.array(repositoryReviewSchema),
+    reviews: z.array(
+      repositoryReviewSchema.extend({
+        usage: reviewUsageInternalSchema.nullable(),
+      }),
+    ),
   })
   .strict();
 
@@ -132,5 +150,6 @@ export const createReviewResponseSchema = z
   })
   .strict();
 
+export type ReviewUsageInternal = z.infer<typeof reviewUsageInternalSchema>;
 export type RepositoryReview = z.infer<typeof repositoryReviewSchema>;
 export type ReviewsResponse = z.infer<typeof reviewsResponseSchema>;

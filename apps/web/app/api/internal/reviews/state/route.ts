@@ -3,7 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db/drizzle";
-import { review } from "@/db/schema";
+import { CreateReviewUsage, review, reviewUsage } from "@/db/schema";
 import env from "@/lib/environment";
 import { reviewStateSchema } from "@/lib/contracts/review";
 
@@ -58,6 +58,8 @@ export async function PATCH(request: Request) {
         ? {
             status: input.status,
             result: input.result,
+            usage: input.usage,
+            cost: input.cost,
             error: null,
             finishedAt: new Date(),
             updatedAt: new Date(),
@@ -66,23 +68,50 @@ export async function PATCH(request: Request) {
             status: input.status,
             result: null,
             error: input.error,
+            usage: input.usage,
+            cost: input.cost,
             finishedAt: new Date(),
             updatedAt: new Date(),
           };
 
-  const [updatedReview] = await db
-    .update(review)
-    .set(values)
-    .where(
-      and(
-        eq(review.id, input.reviewId),
-        inArray(review.status, previousStatuses),
-      ),
-    )
-    .returning({ id: review.id, status: review.status });
+  const { updatedReview, recordedUsage } = await db.transaction(async (tx) => {
+    const [updatedReview] = await tx
+      .update(review)
+      .set(values)
+      .where(
+        and(
+          eq(review.id, input.reviewId),
+          inArray(review.status, previousStatuses),
+        ),
+      )
+      .returning({ id: review.id, status: review.status });
+
+    let recordedUsage: CreateReviewUsage | null = null;
+    if (values.status === "failed" || values.status === "finished") {
+      const [insertedUsage] = await tx
+        .insert(reviewUsage)
+        .values({
+          id: crypto.randomUUID(),
+          reviewId: input.reviewId,
+          requestCount: values.usage.requestCount,
+          responsesWithUsage: values.usage.requestCount,
+          inputTokens: values.usage.requestCount,
+          cachedInputTokens: values.usage.requestCount,
+          cacheWriteTokens: values.usage.requestCount,
+          outputTokens: values.usage.requestCount,
+          reasoningTokens: values.usage.requestCount,
+          totalTokens: values.usage.requestCount,
+          estimatedCostUsd: values.cost.estimatedUsd,
+        })
+        .returning();
+      recordedUsage = insertedUsage;
+    }
+
+    return { updatedReview, recordedUsage };
+  });
 
   if (updatedReview) {
-    return Response.json({ review: updatedReview });
+    return Response.json({ review: updatedReview, usage: recordedUsage });
   }
 
   // if no row was updated, we check what happened
