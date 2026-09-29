@@ -1,6 +1,6 @@
 # Use a Python image with uv pre-installed 
 # source: https://github.com/astral-sh/uv-docker-example/blob/main/Dockerfile
-FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim
+FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim AS base
 
 # Setup a non-root user
 RUN groupadd --system --gid 999 worker \
@@ -42,6 +42,21 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
+
+
+# ===== DEV =====
+FROM base AS dev
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked && chown -R worker:worker /app
+ENTRYPOINT []
+USER worker
+
+CMD ["python", "-m", "src.worker"]
+
+
+# ===== PROD =====
+FROM base AS production
 
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []
