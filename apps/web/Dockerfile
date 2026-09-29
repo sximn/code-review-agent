@@ -8,6 +8,15 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 
+FROM deps AS dev
+
+COPY . .
+RUN chown -R node:node /app
+USER node
+
+CMD ["pnpm", "exec", "next", "dev", "--hostname", "0.0.0.0"]
+
+
 FROM deps AS migration
 
 COPY . .
