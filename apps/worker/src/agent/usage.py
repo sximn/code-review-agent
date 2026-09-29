@@ -51,7 +51,9 @@ class UsageAccumulator:
             return
 
         if any(value is None for value in token_values):
-            raise ValueError("Token usage must be supplied completely or not at all")
+            raise ValueError(
+                f"Token usage must be supplied completely or not at all | {input_tokens=} {cached_input_tokens=} {cache_write_tokens=} {output_tokens=} {reasoning_tokens=} {total_tokens=}"
+            )
 
         assert input_tokens is not None
         assert cached_input_tokens is not None
@@ -130,16 +132,20 @@ def record_chat_completion_usage(
         model=response.model,
         input_tokens=usage.prompt_tokens,
         cached_input_tokens=(
-            prompt_details.cached_tokens if prompt_details is not None else 0
+            (prompt_details.cached_tokens if prompt_details is not None else 0) or 0
         ),
         cache_write_tokens=(
-            prompt_details.cache_write_tokens if prompt_details is not None else 0
+            (prompt_details.cache_write_tokens if prompt_details is not None else 0)
+            or 0
         ),
         output_tokens=usage.completion_tokens,
         reasoning_tokens=(
-            completion_details.reasoning_tokens or 0
-            if completion_details is not None
-            else 0
+            (
+                completion_details.reasoning_tokens
+                if completion_details is not None
+                else 0
+            )
+            or 0
         ),
         total_tokens=usage.total_tokens,
     )
