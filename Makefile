@@ -1,4 +1,5 @@
 DEV_ENV ?= .env
+DEV_ENV_ABS_PATH = $(realpath $(DEV_ENV))
 DEV = ENV_FILE=$(DEV_ENV) docker compose --env-file $(DEV_ENV) \
 	-p code-review-agent-system-dev \
 	-f docker-compose.yml -f docker-compose.dev.yml
@@ -19,33 +20,19 @@ ensure-dev-env:
 	  fi; \
 	else \
 		printf "\033[0;38;5;240;49mUsing existing \033[36m%s\033[0m \033[0;38;5;240;49mfor compose stack\033[0m\n" "$(DEV_ENV)"; \
-	fi; \
-	dry_run=$$dry_run find ./apps/web -type f -name .env.example \
-	  -exec sh -c ' \
-	    for src do \
-	      dst=$${src%.example}; \
-	      if [ ! -e "$$dst" ]; then \
-	        printf "\033[2mcp \"%s\" \"%s\"\033[0m\n" "$$src" "$$dst"; \
-	        if [ "$$dry_run" = 1 ]; then \
-	          printf "\033[0;38;5;240;49mWould copy \033[36m%s\033[0m to \033[32m%s\033[0m\n" "$$src" "$$dst"; \
-	        else \
-	          cp "$$src" "$$dst" || exit 1; \
-	          printf "\033[0;38;5;240;49mCreated %s from %s\033[0m\n" "$$dst" "$$src"; \
-	        fi; \
-	      else \
-	        printf "\033[0;38;5;240;49mUsing existing \033[36m%s\033[0m \033[0;38;5;240;49mfor nextjs app\033[0m\n" "$$dst"; \
-	      fi; \
-	    done \
-	  ' sh {} +
+	fi;
 
 dev dev-sandbox: ensure-dev-env
 
 dev:
-	$(DEV) up -d --build
+	$(DEV) up -d
 	@$(DEV) watch --no-up worker & \
 	  watch_pid=$$!; \
 	  trap 'kill $$watch_pid 2>/dev/null || true' EXIT INT TERM; \
-	  cd apps/web && pnpm run dev
+	  env_abs_path=$$(realpath "$(DEV_ENV)") && \
+	  cd apps/web && \
+	  printf 'ENV_ABS_PATH=%s\n' "$$env_abs_path" && \
+	  pnpm exec dotenv -e "$$env_abs_path" -o -- pnpm run dev
 
 dev-sandbox:
 	$(DEV) --profile sandbox up --build --watch
