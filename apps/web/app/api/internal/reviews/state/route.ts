@@ -93,15 +93,15 @@ export async function PATCH(request: Request) {
         .values({
           id: crypto.randomUUID(),
           reviewId: input.reviewId,
-          requestCount: values.usage.requestCount,
-          responsesWithUsage: values.usage.requestCount,
-          inputTokens: values.usage.requestCount,
-          cachedInputTokens: values.usage.requestCount,
-          cacheWriteTokens: values.usage.requestCount,
-          outputTokens: values.usage.requestCount,
-          reasoningTokens: values.usage.requestCount,
-          totalTokens: values.usage.requestCount,
-          estimatedCostUsd: values.cost.estimatedUsd,
+          requestCount: values.usage.request_count,
+          responsesWithUsage: values.usage.responses_with_usage,
+          inputTokens: values.usage.input_tokens,
+          cachedInputTokens: values.usage.cached_input_tokens,
+          cacheWriteTokens: values.usage.cache_write_tokens,
+          outputTokens: values.usage.output_tokens,
+          reasoningTokens: values.usage.reasoning_tokens,
+          totalTokens: values.usage.total_tokens,
+          estimatedCostUsd: values.cost.estimated_usd,
         })
         .returning();
       recordedUsage = insertedUsage;

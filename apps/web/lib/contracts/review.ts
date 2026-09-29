@@ -38,28 +38,30 @@ export const reviewCostSchema = z.object({
     "usage-unavailable",
     "not-applicable",
   ]),
-  estimatedUsd: moneyAmountString,
-  pricingVersion: z.iso.date(),
+  estimated_usd: moneyAmountString,
+  pricing_version: z.iso.date(),
   partial: z.boolean(),
 });
 
 export const modelUsageSchema = z.object({
   model: z.string(),
-  requestCount: count,
-  inputTokens: count,
-  cachedInputTokens: count,
-  outputTokens: count,
-  reasoningTokens: count,
+  request_count: count,
+  input_tokens: count,
+  cached_input_tokens: count,
+  output_tokens: count,
+  reasoning_tokens: count,
 });
 
 export const reviewUsageSchema = z.object({
   provider: z.string(),
-  requestCount: count,
-  inputTokens: count,
-  cachedInputTokens: count,
-  outputTokens: count,
-  reasoningTokens: count,
-  totalTokens: count,
+  request_count: count,
+  responses_with_usage: count,
+  input_tokens: count,
+  cached_input_tokens: count,
+  cache_write_tokens: count,
+  output_tokens: count,
+  reasoning_tokens: count,
+  total_tokens: count,
   models: z.array(modelUsageSchema),
 });
 
