@@ -1,6 +1,6 @@
 import { RPCHandler } from "@orpc/server/fetch";
 
-import { errorStatusMap } from "@/lib/orpc/errors";
+import { errorStatusMap } from "@/lib/orpc/contract/errors";
 import { appRouter } from "@/lib/orpc/server/router";
 
 const handler = new RPCHandler(appRouter, { errorStatusMap });

@@ -173,6 +173,19 @@ export async function getRepositoryReviewsById(
     .limit(100);
 }
 
+export async function findConnectedRepository(
+  userId: string,
+  repositoryId: string,
+) {
+  const [connectedRepository] = await db
+    .select()
+    .from(repository)
+    .where(and(eq(repository.userId, userId), eq(repository.id, repositoryId)))
+    .limit(1);
+
+  return connectedRepository ?? null;
+}
+
 export async function getRecentReviews(userId: string): Promise<Review[]> {
   void userId;
 

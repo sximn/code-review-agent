@@ -2,7 +2,7 @@ import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferenceHandlerPlugin } from "@orpc/openapi/plugins";
 
 import { auth } from "@/lib/auth";
-import { errorStatusMap } from "@/lib/orpc/errors";
+import { errorStatusMap } from "@/lib/orpc/contract/errors";
 import { generateOpenAPISpec } from "@/lib/orpc/openapi";
 import { apiRouter } from "@/lib/orpc/server/router";
 import { hasValidWorkerToken } from "@/lib/worker-auth";

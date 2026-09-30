@@ -1,8 +1,8 @@
 import { OpenAPIGenerator } from "@orpc/openapi";
 import { ZodToJsonSchemaConverter } from "@orpc/zod";
 
-import { apiContract } from "@/lib/orpc/contracts";
-import { errorStatusMap } from "@/lib/orpc/errors";
+import { apiContract } from "@/lib/orpc/contract";
+import { errorStatusMap } from "@/lib/orpc/contract/errors";
 
 const generator = new OpenAPIGenerator({
   converters: [new ZodToJsonSchemaConverter({ cache: true })],
