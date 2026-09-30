@@ -4,10 +4,7 @@ const count = z.int().nonnegative();
 
 const moneyAmountString = z
   .string()
-  .regex(/^\d+(?:\.\d+)?$/)
-  .refine((val) => Number.parseFloat(val) > 0, {
-    message: "Money amount must be greater than 0",
-  });
+  .regex(/^\d+(?:\.\d+)?$/, "Money amount must be a non-negative decimal");
 
 export const findingSchema = z
   .object({
@@ -22,48 +19,64 @@ export const findingSchema = z
     recommendation: z.string(),
     confidence: z.number().min(0).max(1),
   })
-  .strict();
+  .strict()
+  .meta({ id: "Finding" });
 
 export const reviewResultSchema = z
   .object({
     findings: z.array(findingSchema),
     approval_granted: z.boolean(),
   })
-  .strict();
+  .strict()
+  .meta({ id: "ReviewResult" });
 
-export const reviewCostSchema = z.object({
-  status: z.enum([
-    "estimated",
-    "unsupported-model",
-    "usage-unavailable",
-    "not-applicable",
-  ]),
-  estimated_usd: moneyAmountString,
-  pricing_version: z.iso.date(),
-  partial: z.boolean(),
-});
+export const reviewCostSchema = z
+  .object({
+    status: z.enum([
+      "estimated",
+      "unsupported-model",
+      "usage-unavailable",
+      "not-applicable",
+    ]),
+    estimated_usd: moneyAmountString.nullable(),
+    pricing_version: z.iso.date().nullable(),
+    partial: z.boolean(),
+    unsupported_models: z.array(z.string()),
+  })
+  .strict()
+  .meta({ id: "ReviewCost" });
 
-export const modelUsageSchema = z.object({
-  model: z.string(),
-  request_count: count,
-  input_tokens: count,
-  cached_input_tokens: count,
-  output_tokens: count,
-  reasoning_tokens: count,
-});
+export const modelUsageSchema = z
+  .object({
+    model: z.string(),
+    request_count: count,
+    responses_with_usage: count,
+    input_tokens: count,
+    cached_input_tokens: count,
+    cache_write_tokens: count,
+    output_tokens: count,
+    reasoning_tokens: count,
+    total_tokens: count,
+  })
+  .strict()
+  .meta({ id: "ModelUsage" });
 
-export const reviewUsageSchema = z.object({
-  provider: z.string(),
-  request_count: count,
-  responses_with_usage: count,
-  input_tokens: count,
-  cached_input_tokens: count,
-  cache_write_tokens: count,
-  output_tokens: count,
-  reasoning_tokens: count,
-  total_tokens: count,
-  models: z.array(modelUsageSchema),
-});
+export const reviewUsageSchema = z
+  .object({
+    provider: z.literal("openai"),
+    request_count: count,
+    responses_with_usage: count,
+    responses_without_usage: count,
+    input_tokens: count,
+    cached_input_tokens: count,
+    cache_write_tokens: count,
+    output_tokens: count,
+    reasoning_tokens: count,
+    total_tokens: count,
+    models: z.array(modelUsageSchema),
+  })
+  .strict()
+  .meta({ id: "ReviewUsage" });
 
 export const reviewStateSchema = z.discriminatedUnion("status", [
   z
@@ -78,8 +91,8 @@ export const reviewStateSchema = z.discriminatedUnion("status", [
       reviewId: z.uuid(),
       status: z.literal("finished"),
       result: reviewResultSchema,
-      usage: reviewUsageSchema,
-      cost: reviewCostSchema,
+      usage: reviewUsageSchema.optional(),
+      cost: reviewCostSchema.optional(),
     })
     .strict(),
 
@@ -88,8 +101,8 @@ export const reviewStateSchema = z.discriminatedUnion("status", [
       reviewId: z.uuid(),
       status: z.literal("failed"),
       error: z.string().min(1).max(2000),
-      usage: reviewUsageSchema,
-      cost: reviewCostSchema,
+      usage: reviewUsageSchema.optional(),
+      cost: reviewCostSchema.optional(),
     })
     .strict(),
 ]);
@@ -105,7 +118,7 @@ export const reviewStatusSchema = z.enum([
   "failed",
 ]);
 
-const apiDateSchema = z.iso.datetime().transform((value) => new Date(value));
+const apiDateSchema = z.date();
 
 export const repositoryReviewSchema = z
   .object({
@@ -120,29 +133,35 @@ export const repositoryReviewSchema = z
     updatedAt: apiDateSchema,
     createdAt: apiDateSchema,
   })
-  .strict();
+  .strict()
+  .meta({ id: "RepositoryReview" });
 
-export const reviewUsageInternalSchema = z.object({
-  id: z.uuid(),
-  reviewId: z.uuid(),
-  requestCount: count,
-  responsesWithUsage: count,
-  inputTokens: count,
-  cachedInputTokens: count,
-  cacheWriteTokens: count,
-  outputTokens: count,
-  reasoningTokens: count,
-  totalTokens: count,
-  estimatedCostUsd: moneyAmountString,
-});
+export const reviewUsageInternalSchema = z
+  .object({
+    id: z.uuid(),
+    reviewId: z.uuid(),
+    requestCount: count,
+    responsesWithUsage: count,
+    inputTokens: count,
+    cachedInputTokens: count,
+    cacheWriteTokens: count,
+    outputTokens: count,
+    reasoningTokens: count,
+    totalTokens: count,
+    estimatedCostUsd: moneyAmountString.nullable(),
+  })
+  .strict()
+  .meta({ id: "StoredReviewUsage" });
+
+export const repositoryReviewWithUsageSchema = repositoryReviewSchema
+  .extend({
+    usage: reviewUsageInternalSchema.nullable(),
+  })
+  .meta({ id: "RepositoryReviewWithUsage" });
 
 export const reviewsResponseSchema = z
   .object({
-    reviews: z.array(
-      repositoryReviewSchema.extend({
-        usage: reviewUsageInternalSchema.nullable(),
-      }),
-    ),
+    reviews: z.array(repositoryReviewWithUsageSchema),
   })
   .strict();
 
@@ -154,4 +173,7 @@ export const createReviewResponseSchema = z
 
 export type ReviewUsageInternal = z.infer<typeof reviewUsageInternalSchema>;
 export type RepositoryReview = z.infer<typeof repositoryReviewSchema>;
+export type RepositoryReviewWithUsage = z.infer<
+  typeof repositoryReviewWithUsageSchema
+>;
 export type ReviewsResponse = z.infer<typeof reviewsResponseSchema>;

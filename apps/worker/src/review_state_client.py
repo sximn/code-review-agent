@@ -44,7 +44,6 @@ class ReviewStateClient:
         cost: dict[str, Any] | None = None,
     ) -> StoredReviewStatus:
         payload: dict[str, Any] = {
-            "reviewId": review_id,
             "status": status,
         }
 
@@ -64,7 +63,7 @@ class ReviewStateClient:
         for attempt in range(self.max_attempts):
             try:
                 response = await self._client.patch(
-                    "/api/internal/reviews/state",
+                    f"/api/v1/internal/reviews/{review_id}/state",
                     json=payload,
                 )
                 if response.status_code < 500:

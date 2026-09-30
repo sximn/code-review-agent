@@ -5,15 +5,14 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 
+import { client } from "@/lib/orpc/client";
 import { isRepositoryName, normalizeRepository } from "@/lib/repository-name";
 
 import { AccessStep } from "./access-step";
 import { ConfigurationStep } from "./configuration-step";
 import { RepositoryStep } from "./repository-step";
 import type {
-  RepositoryCheckResult,
   RepositoryCheckStatus,
-  RepositorySaveResult,
   RepositorySetupStep,
   WizardDirection,
 } from "./types";
@@ -107,30 +106,10 @@ export function RepositorySetupWizard({
     setCheckError(null);
 
     try {
-      const response = await fetch("/api/repositories/check", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ repository: normalizedRepository }),
-        signal: controller.signal,
-      });
-      const data = (await response
-        .json()
-        .catch(() => null)) as RepositoryCheckResult | null;
-
-      if (!response.ok) {
-        setCheckStatus("error");
-        setCheckError(
-          data?.error ??
-            "We couldn't reach that repository. Check the name; private repositories aren't available yet.",
-        );
-        return;
-      }
-
-      if (!data?.repository) {
-        setCheckStatus("error");
-        setCheckError("We couldn't verify that repository. Please try again.");
-        return;
-      }
+      const data = await client.repositories.check(
+        { repository: normalizedRepository },
+        { signal: controller.signal },
+      );
 
       setRepository(data.repository.fullName);
       setCheckStatus("success");
@@ -141,7 +120,9 @@ export function RepositorySetupWizard({
 
       setCheckStatus("error");
       setCheckError(
-        "Something went wrong while checking the repository. Please try again.",
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while checking the repository. Please try again.",
       );
     }
   }
@@ -151,28 +132,17 @@ export function RepositorySetupWizard({
     setSaveError(null);
 
     try {
-      const response = await fetch("/api/repositories", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ repository }),
-      });
-      const data = (await response
-        .json()
-        .catch(() => null)) as RepositorySaveResult | null;
-
-      if (!response.ok) {
-        setSaveError(
-          data?.error ??
-            "We couldn't connect this repository. Please try again.",
-        );
-        return;
-      }
+      await client.repositories.connect({ repository });
 
       onComplete();
       toast.success("Repository connected");
       router.refresh();
-    } catch {
-      setSaveError("We couldn't connect this repository. Please try again.");
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "We couldn't connect this repository. Please try again.",
+      );
     } finally {
       setIsSaving(false);
     }

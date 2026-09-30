@@ -145,6 +145,34 @@ export async function getRepositoryReviews(
     .limit(100);
 }
 
+export async function getRepositoryReviewsById(
+  userId: string,
+  repositoryId: string,
+) {
+  return db
+    .select({
+      id: review.id,
+      repositoryId: review.repositoryId,
+      pullRequestNumber: review.pullRequestNumber,
+      result: review.result,
+      status: review.status,
+      error: review.error,
+      startedAt: review.startedAt,
+      finishedAt: review.finishedAt,
+      updatedAt: review.updatedAt,
+      createdAt: review.createdAt,
+      usage: {
+        ...reviewUsage,
+      },
+    })
+    .from(review)
+    .innerJoin(repository, eq(review.repositoryId, repository.id))
+    .leftJoin(reviewUsage, eq(reviewUsage.reviewId, review.id))
+    .where(and(eq(repository.userId, userId), eq(repository.id, repositoryId)))
+    .orderBy(desc(review.createdAt))
+    .limit(100);
+}
+
 export async function getRecentReviews(userId: string): Promise<Review[]> {
   void userId;
 

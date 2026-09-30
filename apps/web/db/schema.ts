@@ -147,7 +147,7 @@ export const reviewUsage = pgTable("review_usage", {
   reasoningTokens: integer("reasoning_tokens").notNull(),
   totalTokens: integer("total_tokens").notNull(),
 
-  estimatedCostUsd: numeric("esitmated_cost_usd").notNull(),
+  estimatedCostUsd: numeric("esitmated_cost_usd"),
 });
 
 export type CreateReviewUsage = typeof reviewUsage.$inferInsert;

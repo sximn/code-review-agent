@@ -1,26 +1,9 @@
-import { timingSafeEqual } from "node:crypto";
-
-import { and, eq, inArray, sql } from "drizzle-orm";
-
-import { db } from "@/db/drizzle";
-import { CreateReviewUsage, review, reviewUsage } from "@/db/schema";
-import env from "@/lib/environment";
 import { reviewStateSchema } from "@/lib/contracts/review";
-
-function hasValidWorkerToken(request: Request): boolean {
-  const received = request.headers.get("authorization") ?? "";
-  const expected = `Bearer ${env.WORKER_API_TOKEN}`;
-  const receivedBuffer = Buffer.from(received);
-  const expectedBuffer = Buffer.from(expected);
-
-  return (
-    receivedBuffer.length === expectedBuffer.length &&
-    timingSafeEqual(receivedBuffer, expectedBuffer)
-  );
-}
+import { applyReviewState } from "@/lib/review-state";
+import { hasValidWorkerToken } from "@/lib/worker-auth";
 
 export async function PATCH(request: Request) {
-  if (!hasValidWorkerToken(request)) {
+  if (!hasValidWorkerToken(request.headers)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -37,108 +20,21 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const input = parsed.data;
-  const previousStatuses =
-    input.status === "running"
-      ? (["scheduled"] as const)
-      : input.status === "finished"
-        ? (["running"] as const)
-        : (["scheduled", "running"] as const);
+  const result = await applyReviewState(parsed.data);
 
-  const values =
-    input.status === "running"
-      ? {
-          status: input.status,
-          startedAt: sql<Date>`coalesce(${review.startedAt}, now())`,
-          finishedAt: null,
-          error: null,
-          updatedAt: new Date(),
-        }
-      : input.status === "finished"
-        ? {
-            status: input.status,
-            result: input.result,
-            usage: input.usage,
-            cost: input.cost,
-            error: null,
-            finishedAt: new Date(),
-            updatedAt: new Date(),
-          }
-        : {
-            status: input.status,
-            result: null,
-            error: input.error,
-            usage: input.usage,
-            cost: input.cost,
-            finishedAt: new Date(),
-            updatedAt: new Date(),
-          };
-
-  const { updatedReview, recordedUsage } = await db.transaction(async (tx) => {
-    const [updatedReview] = await tx
-      .update(review)
-      .set(values)
-      .where(
-        and(
-          eq(review.id, input.reviewId),
-          inArray(review.status, previousStatuses),
-        ),
-      )
-      .returning({ id: review.id, status: review.status });
-
-    let recordedUsage: CreateReviewUsage | null = null;
-    if (values.status === "failed" || values.status === "finished") {
-      const [insertedUsage] = await tx
-        .insert(reviewUsage)
-        .values({
-          id: crypto.randomUUID(),
-          reviewId: input.reviewId,
-          requestCount: values.usage.request_count,
-          responsesWithUsage: values.usage.responses_with_usage,
-          inputTokens: values.usage.input_tokens,
-          cachedInputTokens: values.usage.cached_input_tokens,
-          cacheWriteTokens: values.usage.cache_write_tokens,
-          outputTokens: values.usage.output_tokens,
-          reasoningTokens: values.usage.reasoning_tokens,
-          totalTokens: values.usage.total_tokens,
-          estimatedCostUsd: values.cost.estimated_usd,
-        })
-        .returning();
-      recordedUsage = insertedUsage;
-    }
-
-    return { updatedReview, recordedUsage };
-  });
-
-  if (updatedReview) {
-    return Response.json({ review: updatedReview, usage: recordedUsage });
+  if (result.kind === "updated") {
+    return Response.json({ review: result.review, usage: result.usage });
   }
-
-  // if no row was updated, we check what happened
-  const [currentReview] = await db
-    .select({ id: review.id, status: review.status })
-    .from(review)
-    .where(eq(review.id, input.reviewId))
-    .limit(1);
-
-  if (!currentReview) {
+  if (result.kind === "idempotent") {
+    return Response.json({ review: result.review });
+  }
+  if (result.kind === "not-found") {
     return Response.json({ error: "Review not found." }, { status: 404 });
-  }
-
-  // callback was called again, or a message was reclaimed after worker already finished
-  // that is valid and can happen, but we cannot override the stored data here
-  if (
-    currentReview.status === input.status ||
-    (input.status === "running" &&
-      (currentReview.status === "failed" ||
-        currentReview.status === "finished"))
-  ) {
-    return Response.json({ review: currentReview });
   }
 
   return Response.json(
     {
-      error: `Cannot change review from ${currentReview.status} to ${input.status}.`,
+      error: `Cannot change review from ${result.currentStatus} to ${parsed.data.status}.`,
     },
     { status: 409 },
   );

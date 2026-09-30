@@ -16,109 +16,15 @@ import {
   Send,
 } from "lucide-react";
 import type { ConnectedRepository } from "@/lib/dashboard";
-import type { PullRequest } from "@/lib/repositories";
 import {
-  createReviewResponseSchema,
-  reviewsResponseSchema,
   type ReviewsResponse,
   type RepositoryReview,
-  ReviewUsageInternal,
+  type ReviewUsageInternal,
 } from "@/lib/contracts/review";
+import { orpc } from "@/lib/orpc/client";
 import { Button } from "@/components/ui/button";
-import z from "zod";
 
 const PULL_REQUESTS_PER_PAGE = 25;
-
-type PullRequestsPage = {
-  pullRequests: PullRequest[];
-  nextPage: number | null;
-};
-
-type RepositoryReviewWithUsage = RepositoryReview & {
-  usage: ReviewUsageInternal | null;
-};
-
-async function fetchPullRequests({
-  repositoryName,
-  page,
-  signal,
-}: {
-  repositoryName: string;
-  page: number;
-  signal?: AbortSignal;
-}): Promise<PullRequestsPage> {
-  const params = new URLSearchParams({
-    repository: repositoryName,
-    page: String(page),
-    perPage: String(PULL_REQUESTS_PER_PAGE),
-  });
-
-  const response = await fetch(`/api/repositories/pull-requests?${params}`, {
-    signal,
-  });
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-
-    throw new Error(
-      body?.error ?? "We couldn't load pull requests. Please try again.",
-    );
-  }
-
-  return response.json();
-}
-
-async function fetchReviews(
-  repositoryName: string,
-  signal?: AbortSignal,
-): Promise<ReviewsResponse> {
-  const params = new URLSearchParams({ repository: repositoryName });
-  const response = await fetch(`/api/reviews?${params}`, { signal });
-
-  const body: unknown = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    throw new Error("Review statuses could not be loaded.");
-  }
-
-  const parsed = reviewsResponseSchema.safeParse(body);
-
-  if (!parsed.success) {
-    console.error("Invalid reviews API response", parsed.error);
-    throw new Error("The reviews API returned an invalid response.");
-  }
-
-  return parsed.data;
-}
-
-async function createReview(repositoryName: string, pullRequestNumber: number) {
-  const params = new URLSearchParams({
-    repository: repositoryName,
-    pullRequestNumber: String(pullRequestNumber),
-  });
-  const response = await fetch(`/api/reviews?${params}`, { method: "POST" });
-
-  const body: unknown = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const errorResult = z.object({ error: z.string() }).safeParse(body);
-
-    throw new Error(
-      errorResult.success
-        ? errorResult.data.error
-        : "The review could not be started.",
-    );
-  }
-
-  const parsed = createReviewResponseSchema.safeParse(body);
-
-  if (!parsed.success) {
-    console.error("Invalid create-review API response", parsed.error);
-    throw new Error("The review API returned an invalid response.");
-  }
-
-  return parsed.data;
-}
 
 const severityStyles = {
   critical: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
@@ -148,9 +54,13 @@ function formatLocation(
 }
 
 function EstimatedReviewUsage({ usage }: { usage: ReviewUsageInternal }) {
+  const estimate = usage.estimatedCostUsd
+    ? `$${usage.estimatedCostUsd}`
+    : "unavailable";
+
   return (
     <span className="rounded-xl border border-border">
-      estimated cost: ${usage.estimatedCostUsd}
+      estimated cost: {estimate}
     </span>
   );
 }
@@ -158,7 +68,7 @@ function EstimatedReviewUsage({ usage }: { usage: ReviewUsageInternal }) {
 function ReviewDetails({
   review,
 }: {
-  review: RepositoryReviewWithUsage | undefined;
+  review: ReviewsResponse["reviews"][number] | undefined;
 }) {
   if (!review) {
     return null;
@@ -353,55 +263,56 @@ export function RepositoryRow({
   const queryClient = useQueryClient();
   const panelId = `repository-${repo.id}-pull-requests`;
 
-  const reviewsQuery = useQuery({
-    queryKey: ["repository-reviews", repo.id],
-    queryFn: ({ signal }) => fetchReviews(repo.name, signal),
-    refetchInterval: (query) =>
-      query.state.data?.reviews.some(
-        (review) =>
-          review.status === "scheduled" || review.status === "running",
-      )
-        ? 2_000
-        : false,
-  });
+  const reviewsQuery = useQuery(
+    orpc.reviews.list.queryOptions({
+      input: { repositoryId: repo.id },
+      refetchInterval: (query) =>
+        query.state.data?.reviews.some(
+          (review) =>
+            review.status === "scheduled" || review.status === "running",
+        )
+          ? 2_000
+          : false,
+    }),
+  );
 
-  const createReviewMutation = useMutation({
-    mutationFn: (pullRequestNumber: number) =>
-      createReview(repo.name, pullRequestNumber),
-    onSuccess: ({ review: createdReview }) => {
-      queryClient.setQueryData<ReviewsResponse>(
-        ["repository-reviews", repo.id],
-        (current) => ({
-          reviews: [
-            {
-              ...createdReview,
-              usage: null,
-            },
-            ...(current?.reviews.filter(
-              (review) => review.id !== createdReview.id,
-            ) ?? []),
-          ],
-        }),
-      );
-    },
-  });
+  const createReviewMutation = useMutation(
+    orpc.reviews.create.mutationOptions({
+      onSuccess: ({ review: createdReview }) => {
+        queryClient.setQueryData<ReviewsResponse>(
+          orpc.reviews.list.queryKey({ input: { repositoryId: repo.id } }),
+          (current) => ({
+            reviews: [
+              {
+                ...createdReview,
+                usage: null,
+              },
+              ...(current?.reviews.filter(
+                (review) => review.id !== createdReview.id,
+              ) ?? []),
+            ],
+          }),
+        );
+      },
+    }),
+  );
 
-  const pullRequestsQuery = useInfiniteQuery({
-    queryKey: ["repository-pull-requests", repo.id],
-    queryFn: ({ pageParam, signal }) =>
-      fetchPullRequests({
-        repositoryName: String(repo.name),
-        page: pageParam,
-        signal,
+  const pullRequestsQuery = useInfiniteQuery(
+    orpc.repositories.pullRequests.infiniteOptions({
+      input: (page: number) => ({
+        repositoryId: repo.id,
+        page,
+        perPage: PULL_REQUESTS_PER_PAGE,
       }),
-    initialPageParam: 1,
-    retry: false,
-    getNextPageParam: (lastPage) => lastPage.nextPage ?? undefined,
-    enabled: expanded,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
+      initialPageParam: 1,
+      retry: false,
+      getNextPageParam: (lastPage) => lastPage.nextPage ?? undefined,
+      enabled: expanded,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    }),
+  );
 
   const pullRequests =
     pullRequestsQuery.data?.pages.flatMap((page) => page.pullRequests) ?? [];
@@ -548,7 +459,8 @@ export function RepositoryRow({
 
                       const isStarting =
                         createReviewMutation.isPending &&
-                        createReviewMutation.variables === pullRequest.number;
+                        createReviewMutation.variables.pullRequestNumber ===
+                          pullRequest.number;
 
                       const isActive =
                         latestReview?.status === "scheduled" ||
@@ -606,7 +518,10 @@ export function RepositoryRow({
                                   : "default"
                               }
                               onClick={() =>
-                                createReviewMutation.mutate(pullRequest.number)
+                                createReviewMutation.mutate({
+                                  repositoryId: repo.id,
+                                  pullRequestNumber: pullRequest.number,
+                                })
                               }
                             >
                               {isStarting || isActive ? (
