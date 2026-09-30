@@ -349,7 +349,13 @@ class TestPullRequestReview:
     def assert_failed(self, state_client, message: str) -> None:
         assert state_client.set_state.await_args_list == [
             call("job-1", "running"),
-            call("job-1", "failed", error=message),
+            call(
+                "job-1",
+                "failed",
+                error=message,
+                usage=None,
+                cost=None,
+            ),
         ]
 
     # "happy path"
@@ -393,6 +399,14 @@ class TestPullRequestReview:
                 result={
                     "summary": "Looks good",
                     "findings": [],
+                },
+                usage=None,
+                cost={
+                    "status": "not-applicable",
+                    "estimated_usd": None,
+                    "pricing_version": None,
+                    "partial": False,
+                    "unsupported_models": [],
                 },
             ),
         ]
@@ -760,6 +774,14 @@ class TestPullRequestReview:
             "job-1",
             "finished",
             result={"summary": "OK"},
+            usage=None,
+            cost={
+                "status": "not-applicable",
+                "estimated_usd": None,
+                "pricing_version": None,
+                "partial": False,
+                "unsupported_models": [],
+            },
         )
         # successfully closed even if destroy fails
         sandbox_client.close.assert_awaited_once_with()

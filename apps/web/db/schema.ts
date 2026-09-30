@@ -1,3 +1,4 @@
+import { ReviewResult } from "@/lib/orpc/contract/schemas/review";
 import {
   pgTable,
   pgEnum,
@@ -8,9 +9,8 @@ import {
   index,
   jsonb,
   uniqueIndex,
+  numeric,
 } from "drizzle-orm/pg-core";
-
-import type { ReviewResult } from "@/lib/contracts/review";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -129,3 +129,24 @@ export const review = pgTable(
   },
   (table) => [index("review_repository_id_idx").on(table.repositoryId)],
 );
+
+export const reviewUsage = pgTable("review_usage", {
+  id: text("id").primaryKey(),
+  reviewId: text("review_id")
+    .references(() => review.id, {
+      onDelete: "cascade",
+    })
+    .notNull(),
+  requestCount: integer("request_count").notNull(),
+  responsesWithUsage: integer("responses_with_usage").notNull(),
+  inputTokens: integer("input_tokens").notNull(),
+  cachedInputTokens: integer("cached_input_tokens").notNull(),
+  cacheWriteTokens: integer("cache_write_tokens").notNull(),
+  outputTokens: integer("output_tokens").notNull(),
+  reasoningTokens: integer("reasoning_tokens").notNull(),
+  totalTokens: integer("total_tokens").notNull(),
+
+  estimatedCostUsd: numeric("estimated_cost_usd"),
+});
+
+export type CreateReviewUsage = typeof reviewUsage.$inferInsert;

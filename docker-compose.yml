@@ -155,18 +155,16 @@ services:
 
   drizzle-studio:
     image: ghcr.io/drizzle-team/gateway:latest
-    container_name: drizzle-studio
-    restart: always
     environment:
+      PORT: 4983
       MASTERPASS: ${DRIZZLE_STUDIO_PASSWORD}
     ports:
-      - '4983:4983'
+      - "127.0.0.1:4983:4983"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - app
-    command: ['sh', '-c', 'pnpm db:studio --host=0.0.0.0 --port=4983']
     volumes:
       - drizzle_studio:/app
 

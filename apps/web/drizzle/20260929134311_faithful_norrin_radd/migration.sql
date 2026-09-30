@@ -1,0 +1,1 @@
+ALTER TABLE "review_usage" ALTER COLUMN "esitmated_cost_usd" DROP NOT NULL;

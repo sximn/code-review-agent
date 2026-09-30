@@ -11,7 +11,10 @@ from pydantic import ValidationError
 from redis.asyncio import Redis
 from redis.exceptions import RedisError, ResponseError
 
-from .agent import PRMetadata, run_agent_review, run_mock_agent_review
+from .agent.agent import run_agent_review, run_mock_agent_review
+from .agent.pricing import estimate_review_cost, mock_review_cost
+from .agent.schema import PRMetadata, ReviewCost, ReviewUsage
+from .agent.usage import UsageAccumulator
 from .config import AppConfig
 from .repository import (
     ReviewRequestPayload,
@@ -84,6 +87,10 @@ async def review_pull_request(
     sandbox_id: str | None = None
     result: dict[str, Any] | None = None
     failure: str | None = None
+
+    usage_accumulator: UsageAccumulator | None = None
+    usage: ReviewUsage | None = None
+    cost: ReviewCost | None = None
 
     current_status = await state_client.set_state(job_id, "running")
     if current_status in {"failed", "finished"}:
@@ -174,16 +181,19 @@ async def review_pull_request(
             )
             if config.agent_mode == "mock":
                 review = await run_mock_agent_review(pr_metadata)
+                cost = mock_review_cost()
             else:
                 if not config.openai_api_key:
                     raise RuntimeError("OPENAI_API_KEY is missing.")
+                usage_accumulator = UsageAccumulator()
                 review = await run_agent_review(
                     pr_metadata,
                     config.model,
                     config.openai_api_key,
                     config.max_steps,
-                    sandbox_client,
-                    sandbox_id,
+                    sandbox=sandbox_client,
+                    sandbox_id=sandbox_id,
+                    usage_accumulator=usage_accumulator,
                 )
 
             result = review.model_dump(mode="json")
@@ -203,11 +213,23 @@ async def review_pull_request(
                 logger.exception("Failed to destroy sandbox %s", sandbox_id)
         await sandbox_client.close()
 
+    if usage_accumulator is not None:
+        usage = usage_accumulator.materialize()
+        cost = estimate_review_cost(
+            usage,
+            run_completed=(failure is None and result is not None),
+        )
+
+    usage_payload = usage.model_dump(mode="json") if usage is not None else None
+    cost_payload = cost.model_dump(mode="json") if cost is not None else None
+
     if failure is not None:
         await state_client.set_state(
             job_id,
             "failed",
             error=failure,
+            usage=usage_payload,
+            cost=cost_payload,
         )
         return
 
@@ -217,6 +239,8 @@ async def review_pull_request(
         job_id,
         "finished",
         result=result,
+        usage=usage_payload,
+        cost=cost_payload,
     )
 
 

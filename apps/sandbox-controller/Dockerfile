@@ -1,6 +1,6 @@
 # Use a Python image with uv pre-installed 
 # source: https://github.com/astral-sh/uv-docker-example/blob/main/Dockerfile
-FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim
+FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim AS base
 
 # Setup a non-root user
 RUN groupadd --system --gid 999 sbcontroller \
@@ -42,6 +42,20 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
+
+
+# ===== DEV ======
+FROM base AS dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked && chown -R sbcontroller:sbcontroller /app
+
+ENTRYPOINT []
+USER sbcontroller
+CMD ["uv", "run", "--no-sync", "fastapi", "dev", "src/main.py", "--host", "0.0.0.0", "--port", "8000"]
+
+
+# ===== PROD ======
+FROM base AS production
 
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []

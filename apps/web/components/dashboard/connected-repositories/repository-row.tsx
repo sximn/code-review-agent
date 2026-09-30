@@ -16,104 +16,14 @@ import {
   Send,
 } from "lucide-react";
 import type { ConnectedRepository } from "@/lib/dashboard";
-import type { PullRequest } from "@/lib/repositories";
-import {
-  createReviewResponseSchema,
-  reviewsResponseSchema,
-  type ReviewsResponse,
-  type RepositoryReview,
-} from "@/lib/contracts/review";
+import { ApiOutputs, orpc } from "@/lib/orpc/client";
 import { Button } from "@/components/ui/button";
-import z from "zod";
+import { Finding } from "@/lib/orpc/contract/schemas/review";
+
+type ListedReview = ApiOutputs["reviews"]["list"]["reviews"][number];
+type ListedReviewUsage = NonNullable<ListedReview["usage"]>;
 
 const PULL_REQUESTS_PER_PAGE = 25;
-
-type PullRequestsPage = {
-  pullRequests: PullRequest[];
-  nextPage: number | null;
-};
-
-async function fetchPullRequests({
-  repositoryName,
-  page,
-  signal,
-}: {
-  repositoryName: string;
-  page: number;
-  signal?: AbortSignal;
-}): Promise<PullRequestsPage> {
-  const params = new URLSearchParams({
-    repository: repositoryName,
-    page: String(page),
-    perPage: String(PULL_REQUESTS_PER_PAGE),
-  });
-
-  const response = await fetch(`/api/repositories/pull-requests?${params}`, {
-    signal,
-  });
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-
-    throw new Error(
-      body?.error ?? "We couldn't load pull requests. Please try again.",
-    );
-  }
-
-  return response.json();
-}
-
-async function fetchReviews(
-  repositoryName: string,
-  signal?: AbortSignal,
-): Promise<ReviewsResponse> {
-  const params = new URLSearchParams({ repository: repositoryName });
-  const response = await fetch(`/api/reviews?${params}`, { signal });
-
-  const body: unknown = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    throw new Error("Review statuses could not be loaded.");
-  }
-
-  const parsed = reviewsResponseSchema.safeParse(body);
-
-  if (!parsed.success) {
-    console.error("Invalid reviews API response", parsed.error);
-    throw new Error("The reviews API returned an invalid response.");
-  }
-
-  return parsed.data;
-}
-
-async function createReview(repositoryName: string, pullRequestNumber: number) {
-  const params = new URLSearchParams({
-    repository: repositoryName,
-    pullRequestNumber: String(pullRequestNumber),
-  });
-  const response = await fetch(`/api/reviews?${params}`, { method: "POST" });
-
-  const body: unknown = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const errorResult = z.object({ error: z.string() }).safeParse(body);
-
-    throw new Error(
-      errorResult.success
-        ? errorResult.data.error
-        : "The review could not be started.",
-    );
-  }
-
-  const parsed = createReviewResponseSchema.safeParse(body);
-
-  if (!parsed.success) {
-    console.error("Invalid create-review API response", parsed.error);
-    throw new Error("The review API returned an invalid response.");
-  }
-
-  return parsed.data;
-}
 
 const severityStyles = {
   critical: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
@@ -121,10 +31,7 @@ const severityStyles = {
   medium:
     "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   low: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
-} satisfies Record<
-  NonNullable<RepositoryReview["result"]>["findings"][number]["severity"],
-  string
->;
+} satisfies Record<Finding["severity"], string>;
 
 function formatLocation(
   file: string,
@@ -142,7 +49,19 @@ function formatLocation(
   return `${file}:${lineStart}`;
 }
 
-function ReviewDetails({ review }: { review: RepositoryReview | undefined }) {
+function EstimatedReviewUsage({ usage }: { usage: ListedReviewUsage }) {
+  const estimate = usage.estimatedCostUsd
+    ? `$${usage.estimatedCostUsd}`
+    : "unavailable";
+
+  return (
+    <span className="rounded-xl border border-border">
+      estimated cost: {estimate}
+    </span>
+  );
+}
+
+function ReviewDetails({ review }: { review: ListedReview | undefined }) {
   if (!review) {
     return null;
   }
@@ -185,6 +104,8 @@ function ReviewDetails({ review }: { review: RepositoryReview | undefined }) {
         <p className="mt-1 text-xs wrap-break-word whitespace-pre-wrap text-muted-foreground">
           {review.error ?? "The review failed without an error message."}
         </p>
+
+        {review.usage && <EstimatedReviewUsage usage={review.usage} />}
       </div>
     );
   }
@@ -196,6 +117,7 @@ function ReviewDetails({ review }: { review: RepositoryReview | undefined }) {
         className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300"
       >
         The review finished, but no result was returned.
+        {review.usage && <EstimatedReviewUsage usage={review.usage} />}
       </div>
     );
   }
@@ -225,6 +147,8 @@ function ReviewDetails({ review }: { review: RepositoryReview | undefined }) {
           {findings.length} {findings.length === 1 ? "finding" : "findings"}
         </span>
       </div>
+
+      {review.usage && <EstimatedReviewUsage usage={review.usage} />}
 
       {findings.length === 0 ? (
         <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
@@ -331,52 +255,56 @@ export function RepositoryRow({
   const queryClient = useQueryClient();
   const panelId = `repository-${repo.id}-pull-requests`;
 
-  const reviewsQuery = useQuery({
-    queryKey: ["repository-reviews", repo.id],
-    queryFn: ({ signal }) => fetchReviews(repo.name, signal),
-    refetchInterval: (query) =>
-      query.state.data?.reviews.some(
-        (review) =>
-          review.status === "scheduled" || review.status === "running",
-      )
-        ? 2_000
-        : false,
-  });
+  const reviewsQuery = useQuery(
+    orpc.reviews.list.queryOptions({
+      input: { repositoryId: repo.id },
+      refetchInterval: (query) =>
+        query.state.data?.reviews.some(
+          (review) =>
+            review.status === "scheduled" || review.status === "running",
+        )
+          ? 2_000
+          : false,
+    }),
+  );
 
-  const createReviewMutation = useMutation({
-    mutationFn: (pullRequestNumber: number) =>
-      createReview(repo.name, pullRequestNumber),
-    onSuccess: ({ review: createdReview }) => {
-      queryClient.setQueryData<ReviewsResponse>(
-        ["repository-reviews", repo.id],
-        (current) => ({
-          reviews: [
-            createdReview,
-            ...(current?.reviews.filter(
-              (review) => review.id !== createdReview.id,
-            ) ?? []),
-          ],
-        }),
-      );
-    },
-  });
+  const createReviewMutation = useMutation(
+    orpc.reviews.create.mutationOptions({
+      onSuccess: ({ review: createdReview }) => {
+        queryClient.setQueryData(
+          orpc.reviews.list.queryKey({ input: { repositoryId: repo.id } }),
+          (current) => ({
+            reviews: [
+              {
+                ...createdReview,
+                usage: null,
+              },
+              ...(current?.reviews.filter(
+                (review) => review.id !== createdReview.id,
+              ) ?? []),
+            ],
+          }),
+        );
+      },
+    }),
+  );
 
-  const pullRequestsQuery = useInfiniteQuery({
-    queryKey: ["repository-pull-requests", repo.id],
-    queryFn: ({ pageParam, signal }) =>
-      fetchPullRequests({
-        repositoryName: String(repo.name),
-        page: pageParam,
-        signal,
+  const pullRequestsQuery = useInfiniteQuery(
+    orpc.repositories.pullRequests.infiniteOptions({
+      input: (page: number) => ({
+        repositoryId: repo.id,
+        page,
+        perPage: PULL_REQUESTS_PER_PAGE,
       }),
-    initialPageParam: 1,
-    retry: false,
-    getNextPageParam: (lastPage) => lastPage.nextPage ?? undefined,
-    enabled: expanded,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
+      initialPageParam: 1,
+      retry: false,
+      getNextPageParam: (lastPage) => lastPage.nextPage ?? undefined,
+      enabled: expanded,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    }),
+  );
 
   const pullRequests =
     pullRequestsQuery.data?.pages.flatMap((page) => page.pullRequests) ?? [];
@@ -523,7 +451,8 @@ export function RepositoryRow({
 
                       const isStarting =
                         createReviewMutation.isPending &&
-                        createReviewMutation.variables === pullRequest.number;
+                        createReviewMutation.variables.pullRequestNumber ===
+                          pullRequest.number;
 
                       const isActive =
                         latestReview?.status === "scheduled" ||
@@ -581,7 +510,10 @@ export function RepositoryRow({
                                   : "default"
                               }
                               onClick={() =>
-                                createReviewMutation.mutate(pullRequest.number)
+                                createReviewMutation.mutate({
+                                  repositoryId: repo.id,
+                                  pullRequestNumber: pullRequest.number,
+                                })
                               }
                             >
                               {isStarting || isActive ? (

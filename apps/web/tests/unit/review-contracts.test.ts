@@ -4,7 +4,7 @@ import {
   repositoryReviewSchema,
   reviewResultSchema,
   reviewStateSchema,
-} from "@/lib/contracts/review";
+} from "@/lib/orpc/contract/schemas/review";
 
 const reviewId = "123e4567-e89b-42d3-a456-426614174000";
 
@@ -72,7 +72,9 @@ describe("reviewStateSchema", () => {
 });
 
 describe("repositoryReviewSchema", () => {
-  it("turns API date strings into Date objects", () => {
+  it("keeps native dates provided by the typed RPC transport", () => {
+    const startedAt = new Date("2026-09-18T08:00:00.000Z");
+    const finishedAt = new Date("2026-09-18T08:03:00.000Z");
     const parsed = repositoryReviewSchema.parse({
       id: reviewId,
       repositoryId: "223e4567-e89b-42d3-a456-426614174000",
@@ -80,13 +82,13 @@ describe("repositoryReviewSchema", () => {
       status: "finished",
       result,
       error: null,
-      startedAt: "2026-09-18T08:00:00.000Z",
-      finishedAt: "2026-09-18T08:03:00.000Z",
-      updatedAt: "2026-09-18T08:03:00.000Z",
-      createdAt: "2026-09-18T08:00:00.000Z",
+      startedAt,
+      finishedAt,
+      updatedAt: finishedAt,
+      createdAt: startedAt,
     });
 
-    expect(parsed.startedAt).toEqual(new Date("2026-09-18T08:00:00.000Z"));
-    expect(parsed.finishedAt).toEqual(new Date("2026-09-18T08:03:00.000Z"));
+    expect(parsed.startedAt).toBe(startedAt);
+    expect(parsed.finishedAt).toBe(finishedAt);
   });
 });

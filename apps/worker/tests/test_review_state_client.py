@@ -61,8 +61,8 @@ async def test_set_state_payload_includes_result_and_error(
 
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
+        assert request.url.path == "/api/v1/internal/reviews/review-1/state"
         assert payload == {
-            "reviewId": "review-1",
             "status": "finished",
             **expected_dynamic_fields,
         }

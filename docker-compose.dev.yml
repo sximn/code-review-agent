@@ -1,0 +1,53 @@
+services:
+  web:
+    profiles: ["container-web"]
+
+  worker:
+    build:
+      target: dev
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./apps/worker/src
+          target: /app/src
+          initial_sync: true
+        - action: rebuild
+          path: ./apps/worker/pyproject.toml
+        - action: rebuild
+          path: ./apps/worker/uv.lock
+        - action: rebuild
+          path: ./apps/worker/Dockerfile
+    depends_on: !override
+      migrate:
+        condition: service_completed_successfully
+      dragonfly:
+        condition: service_healthy
+    environment:
+      WEB_SERVICE_URL: http://host.docker.internal:3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  sandbox-controller:
+    build:
+      target: dev
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/sandbox-controller/src
+          target: /app/src
+          initial_sync: true
+        - action: rebuild
+          path: ./apps/sandbox-controller/pyproject.toml
+        - action: rebuild
+          path: ./apps/sandbox-controller/uv.lock
+        - action: rebuild
+          path: ./apps/sandbox-controller/Dockerfile
+
+  dragonfly:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  postgres:
+    container_name: postgres-db-dev
+    ports: !override
+      - "127.0.0.1:5432:5432"
