@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 SupportedProviders = Literal["openai"]
 CostStatus = Literal[
@@ -86,3 +86,7 @@ class ReviewCost(BaseModel):
     pricing_version: str | None
     partial: bool
     unsupported_models: list[str] = Field(default_factory=list)
+
+    @field_serializer("estimated_usd", when_used="json")
+    def _serialize_usd(self, value: Decimal | None) -> str | None:
+        return None if value is None else format(value, "f")
