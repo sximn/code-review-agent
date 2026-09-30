@@ -1,0 +1,1 @@
+ALTER TABLE "review_usage" RENAME COLUMN "esitmated_cost_usd" TO "estimated_cost_usd";
