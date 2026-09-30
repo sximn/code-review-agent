@@ -1,3 +1,4 @@
+import { ReviewResult } from "@/lib/orpc/contract/schemas/review";
 import {
   pgTable,
   pgEnum,
@@ -10,8 +11,6 @@ import {
   uniqueIndex,
   numeric,
 } from "drizzle-orm/pg-core";
-
-import type { ReviewResult } from "@/lib/contracts/review";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),

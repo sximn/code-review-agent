@@ -1,9 +1,4 @@
 import { z } from "zod";
-import { isRepositoryName, normalizeRepository } from "./repository-name";
-
-type RepositoryRequest = {
-  repository?: unknown;
-};
 
 export type PublicRepository = {
   fullName: string;
@@ -27,33 +22,6 @@ const pullRequestSchema = z
 
 const pullRequestsSchema = z.array(pullRequestSchema);
 export type PullRequest = z.output<typeof pullRequestSchema>;
-
-type CheckRepositoryRequestResp =
-  { success: false; error: string } | { success: true; repository: string };
-export async function checkRepositoryRequest(
-  request: Request,
-): Promise<CheckRepositoryRequestResp> {
-  const body = (await request
-    .json()
-    .catch(() => null)) as RepositoryRequest | null;
-  const searchRepository = new URL(request.url).searchParams.get("repository");
-
-  const input =
-    typeof body?.repository === "string"
-      ? body.repository
-      : (searchRepository ?? "");
-
-  const repository = normalizeRepository(input);
-
-  if (!isRepositoryName(repository)) {
-    return {
-      success: false,
-      error: "Enter a repository in owner/repository format.",
-    };
-  }
-
-  return { success: true, repository };
-}
 
 export async function getPublicRepository(
   repository: string,

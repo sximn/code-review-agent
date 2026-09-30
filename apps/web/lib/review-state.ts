@@ -2,7 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db/drizzle";
 import { review, reviewUsage } from "@/db/schema";
-import type { ReviewState } from "@/lib/contracts/review";
+import type { ReviewState } from "@/lib/orpc/contract/schemas/review";
 
 export type ApplyReviewStateResult =
   | {

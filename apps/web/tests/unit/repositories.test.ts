@@ -2,58 +2,10 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  checkRepositoryRequest,
-  getOpenPullRequests,
-  getPublicRepository,
-} from "@/lib/repositories";
+import { getOpenPullRequests, getPublicRepository } from "@/lib/repositories";
 
 afterEach(() => {
   vi.unstubAllGlobals();
-});
-
-describe("checkRepositoryRequest", () => {
-  it("prefers and normalizes a repository in the JSON body", async () => {
-    const request = new Request(
-      "https://example.test/api/repositories?repository=query/repository",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          repository: "https://github.com/body/repository.git",
-        }),
-      },
-    );
-
-    await expect(checkRepositoryRequest(request)).resolves.toEqual({
-      success: true,
-      repository: "body/repository",
-    });
-  });
-
-  it("falls back to the query string when there is no JSON body", async () => {
-    const request = new Request(
-      "https://example.test/api/reviews?repository=owner%2Frepository",
-    );
-
-    await expect(checkRepositoryRequest(request)).resolves.toEqual({
-      success: true,
-      repository: "owner/repository",
-    });
-  });
-
-  it("returns a validation error for malformed input", async () => {
-    const request = new Request("https://example.test/api/reviews", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: "not-json",
-    });
-
-    await expect(checkRepositoryRequest(request)).resolves.toEqual({
-      success: false,
-      error: "Enter a repository in owner/repository format.",
-    });
-  });
 });
 
 describe("getPublicRepository", () => {

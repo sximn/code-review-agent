@@ -112,39 +112,6 @@ export async function getDashboardOverview(
   };
 }
 
-export async function getRepositoryReviews(
-  userId: string,
-  repositoryName: string,
-) {
-  return db
-    .select({
-      id: review.id,
-      repositoryId: review.repositoryId,
-      pullRequestNumber: review.pullRequestNumber,
-      result: review.result,
-      status: review.status,
-      error: review.error,
-      startedAt: review.startedAt,
-      finishedAt: review.finishedAt,
-      updatedAt: review.updatedAt,
-      createdAt: review.createdAt,
-      usage: {
-        ...reviewUsage,
-      },
-    })
-    .from(review)
-    .innerJoin(repository, eq(review.repositoryId, repository.id))
-    .leftJoin(reviewUsage, eq(reviewUsage.reviewId, review.id))
-    .where(
-      and(
-        eq(repository.userId, userId),
-        eq(repository.fullName, repositoryName),
-      ),
-    )
-    .orderBy(desc(review.createdAt))
-    .limit(100);
-}
-
 export async function getRepositoryReviewsById(
   userId: string,
   repositoryId: string,
@@ -184,10 +151,4 @@ export async function findConnectedRepository(
     .limit(1);
 
   return connectedRepository ?? null;
-}
-
-export async function getRecentReviews(userId: string): Promise<Review[]> {
-  void userId;
-
-  return [];
 }

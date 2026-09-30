@@ -16,13 +16,12 @@ import {
   Send,
 } from "lucide-react";
 import type { ConnectedRepository } from "@/lib/dashboard";
-import {
-  type ReviewsResponse,
-  type RepositoryReview,
-  type ReviewUsageInternal,
-} from "@/lib/contracts/review";
-import { orpc } from "@/lib/orpc/client";
+import { ApiOutputs, orpc } from "@/lib/orpc/client";
 import { Button } from "@/components/ui/button";
+import { Finding } from "@/lib/orpc/contract/schemas/review";
+
+type ListedReview = ApiOutputs["reviews"]["list"]["reviews"][number];
+type ListedReviewUsage = NonNullable<ListedReview["usage"]>;
 
 const PULL_REQUESTS_PER_PAGE = 25;
 
@@ -32,10 +31,7 @@ const severityStyles = {
   medium:
     "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   low: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
-} satisfies Record<
-  NonNullable<RepositoryReview["result"]>["findings"][number]["severity"],
-  string
->;
+} satisfies Record<Finding["severity"], string>;
 
 function formatLocation(
   file: string,
@@ -53,7 +49,7 @@ function formatLocation(
   return `${file}:${lineStart}`;
 }
 
-function EstimatedReviewUsage({ usage }: { usage: ReviewUsageInternal }) {
+function EstimatedReviewUsage({ usage }: { usage: ListedReviewUsage }) {
   const estimate = usage.estimatedCostUsd
     ? `$${usage.estimatedCostUsd}`
     : "unavailable";
@@ -65,11 +61,7 @@ function EstimatedReviewUsage({ usage }: { usage: ReviewUsageInternal }) {
   );
 }
 
-function ReviewDetails({
-  review,
-}: {
-  review: ReviewsResponse["reviews"][number] | undefined;
-}) {
+function ReviewDetails({ review }: { review: ListedReview | undefined }) {
   if (!review) {
     return null;
   }
@@ -279,7 +271,7 @@ export function RepositoryRow({
   const createReviewMutation = useMutation(
     orpc.reviews.create.mutationOptions({
       onSuccess: ({ review: createdReview }) => {
-        queryClient.setQueryData<ReviewsResponse>(
+        queryClient.setQueryData(
           orpc.reviews.list.queryKey({ input: { repositoryId: repo.id } }),
           (current) => ({
             reviews: [
