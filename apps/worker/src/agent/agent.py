@@ -412,22 +412,23 @@ async def _run_agent_review(
                 content = json.dumps(
                     {"error": f"Unsupported tool call type: {tool_call.type}"}
                 )
-                continue
+            else:
+                try:
+                    if sandbox is None or sandbox_id is None:
+                        raise RuntimeError("The sandbox is not available.")
 
-            try:
-                if sandbox is None or sandbox_id is None:
-                    raise RuntimeError("The sandbox is not available.")
+                    function_name = tool_call.function.name
+                    if function_name != "sandbox_exec":
+                        raise ValueError(f"Unknown tool: {function_name}")
 
-                function_name = tool_call.function.name
-                if function_name != "sandbox_exec":
-                    raise ValueError(f"Unknown tool: {function_name}")
+                    command, cwd = _validate_tool_arguments(
+                        tool_call.function.arguments
+                    )
 
-                command, cwd = _validate_tool_arguments(tool_call.function.arguments)
-
-                result = await sandbox.exec(sandbox_id, command, cwd)
-                content = _tool_result(result)
-            except Exception as exc:  # noqa: BLE001
-                content = json.dumps({"error": str(exc)[:2000]})
+                    result = await sandbox.exec(sandbox_id, command, cwd)
+                    content = _tool_result(result)
+                except Exception as exc:  # noqa: BLE001
+                    content = json.dumps({"error": str(exc)[:2000]})
 
             messages.append(
                 {
