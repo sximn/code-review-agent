@@ -1,0 +1,427 @@
+{
+  "components": {
+    "schemas": {
+      "CreateSandboxRequest": {
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "CreateSandboxRequest",
+        "type": "object"
+      },
+      "CreateSandboxResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "CreateSandboxResponse",
+        "type": "object"
+      },
+      "ExecCommandRequest": {
+        "properties": {
+          "command": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Command",
+            "type": "array"
+          },
+          "cwd": {
+            "default": "/workspace/repo",
+            "title": "Cwd",
+            "type": "string"
+          },
+          "env": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env"
+          },
+          "timeout_seconds": {
+            "anyOf": [
+              {
+                "maximum": 60.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Seconds"
+          }
+        },
+        "required": [
+          "command"
+        ],
+        "title": "ExecCommandRequest",
+        "type": "object"
+      },
+      "ExecCommandResponse": {
+        "properties": {
+          "exit_code": {
+            "title": "Exit Code",
+            "type": "integer"
+          },
+          "stderr": {
+            "title": "Stderr",
+            "type": "string"
+          },
+          "stdout": {
+            "title": "Stdout",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "exit_code",
+          "stdout",
+          "stderr",
+          "truncated"
+        ],
+        "title": "ExecCommandResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "SandboxStatusResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "SandboxStatusResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "sandboxControllerToken": {
+        "in": "header",
+        "name": "X-Sandbox-Controller-Token",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "description": "Internal API used by the review worker to manage sandboxes.",
+    "title": "Sandbox Controller API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Health",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/sandboxes": {
+      "post": {
+        "operationId": "createSandbox",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSandboxRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSandboxResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Sandbox capacity exhausted"
+          },
+          "503": {
+            "description": "Sandbox runtime unavailable"
+          }
+        },
+        "security": [
+          {
+            "sandboxControllerToken": []
+          }
+        ],
+        "summary": "Create Sandbox"
+      }
+    },
+    "/sandboxes/{sandbox_id}": {
+      "delete": {
+        "operationId": "destroySandbox",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sandbox_id",
+            "required": true,
+            "schema": {
+              "title": "Sandbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Sandbox runtime unavailable"
+          }
+        },
+        "security": [
+          {
+            "sandboxControllerToken": []
+          }
+        ],
+        "summary": "Destroy Sandbox"
+      },
+      "get": {
+        "operationId": "getSandbox",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sandbox_id",
+            "required": true,
+            "schema": {
+              "title": "Sandbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Sandbox not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Sandbox runtime unavailable"
+          }
+        },
+        "security": [
+          {
+            "sandboxControllerToken": []
+          }
+        ],
+        "summary": "Sandbox Status"
+      }
+    },
+    "/sandboxes/{sandbox_id}/exec": {
+      "post": {
+        "operationId": "executeCommand",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sandbox_id",
+            "required": true,
+            "schema": {
+              "title": "Sandbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecCommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Sandbox not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Sandbox runtime unavailable"
+          }
+        },
+        "security": [
+          {
+            "sandboxControllerToken": []
+          }
+        ],
+        "summary": "Execute Command"
+      }
+    }
+  }
+}

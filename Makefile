@@ -4,7 +4,7 @@ DEV = ENV_FILE=$(DEV_ENV) docker compose --env-file $(DEV_ENV) \
 	-p code-review-agent-system-dev \
 	-f docker-compose.yml -f docker-compose.dev.yml
 
-.PHONY: ensure-dev-env dev dev-sandbox dev-down migrate prod-check
+.PHONY: ensure-dev-env dev dev-sandbox dev-down migrate prod-check contracts contracts-check
 
 ensure-dev-env:
 	+@set -eu; \
@@ -46,3 +46,6 @@ migrate:
 
 prod-check:
 	docker compose -f compose.yaml config --quiet
+
+contracts:
+	cd apps/sandbox-controller && uv run --no-sync python -m scripts.export_openapi ../../contracts/sandbox-controller.openapi.json
