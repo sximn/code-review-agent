@@ -6,8 +6,9 @@ from functools import lru_cache
 from typing import Annotated
 
 from docker.errors import DockerException
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, Security, status
 from fastapi.concurrency import asynccontextmanager
+from fastapi.security import APIKeyHeader
 
 from .config import SandboxConfig
 from .sandbox_manager import SandboxCapacityError, SandboxManager
@@ -46,18 +47,25 @@ def get_manager(request: Request) -> SandboxManager:
     return request.app.state.sandbox_manager
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="Sandbox Controller API",
+    version="1.0.0",
+    description="Internal API used by the review worker to manage sandboxes.",
+    lifespan=lifespan,
+)
 
 ConfigDependency = Annotated[SandboxConfig, Depends(get_config)]
 ManagerDependency = Annotated[SandboxManager, Depends(get_manager)]
+token_header = APIKeyHeader(
+    name="X-Sandbox-Controller-Token",
+    scheme_name="sandboxControllerToken",
+    auto_error=False,
+)
 
 
 def require_token(
     config: ConfigDependency,
-    token: Annotated[
-        str | None,
-        Header(alias="X-Sandbox-Controller-Token"),
-    ] = None,
+    token: Annotated[str | None, Security(token_header)],
 ) -> None:
     if not secrets.compare_digest(token or "", config.sandbox_controller_token):
         raise HTTPException(
@@ -68,13 +76,21 @@ def require_token(
 AuthDependency = Annotated[None, Depends(require_token)]
 
 
-@app.get("/health")
+@app.get("/health", operation_id="health")
 async def health(manager: ManagerDependency) -> dict[str, bool]:
     await asyncio.to_thread(manager.client.ping)
     return {"ok": True}
 
 
-@app.post("/sandboxes")
+@app.post(
+    "/sandboxes",
+    operation_id="createSandbox",
+    responses={
+        401: {"description": "Unauthorized"},
+        429: {"description": "Sandbox capacity exhausted"},
+        503: {"description": "Sandbox runtime unavailable"},
+    },
+)
 async def create_sandbox(
     request: CreateSandboxRequest,
     _: AuthDependency,
@@ -107,7 +123,15 @@ async def create_sandbox(
         ) from exc
 
 
-@app.post("/sandboxes/{sandbox_id}/exec")
+@app.post(
+    "/sandboxes/{sandbox_id}/exec",
+    operation_id="executeCommand",
+    responses={
+        401: {"description": "Unauthorized"},
+        404: {"description": "Sandbox not found"},
+        503: {"description": "Sandbox runtime unavailable"},
+    },
+)
 async def execute_command(
     sandbox_id: str,
     request: ExecCommandRequest,
@@ -158,7 +182,15 @@ async def execute_command(
         ) from exc
 
 
-@app.get("/sandboxes/{sandbox_id}")
+@app.get(
+    "/sandboxes/{sandbox_id}",
+    operation_id="getSandbox",
+    responses={
+        401: {"description": "Unauthorized"},
+        404: {"description": "Sandbox not found"},
+        503: {"description": "Sandbox runtime unavailable"},
+    },
+)
 async def sandbox_status(
     sandbox_id: str,
     _: AuthDependency,
@@ -183,7 +215,15 @@ async def sandbox_status(
         ) from exc
 
 
-@app.delete("/sandboxes/{sandbox_id}")
+@app.delete(
+    "/sandboxes/{sandbox_id}",
+    operation_id="destroySandbox",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        401: {"description": "Unauthorized"},
+        503: {"description": "Sandbox runtime unavailable"},
+    },
+)
 async def destroy_sandbox(
     sandbox_id: str,
     _: AuthDependency,
