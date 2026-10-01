@@ -50,3 +50,7 @@ prod-check:
 contracts:
 	cd apps/web && pnpm contracts:generate
 	cd apps/sandbox-controller && uv run --no-sync python -m scripts.export_openapi ../../contracts/sandbox-controller.openapi.json
+
+contracts-check:
+	cd apps/web && pnpm contracts:check
+	cd apps/sandbox-controller && uv run --no-sync python -m scripts.check_openapi ../../contracts/sandbox-controller.openapi.json
