@@ -23,6 +23,9 @@ dev = [
 testpaths = ["tests"]
 asyncio_mode = "strict"
 addopts = "-ra"
+markers = [
+    "integration: tests that require live service dependencies",
+]
 
 [tool.coverage.run]
 branch = true

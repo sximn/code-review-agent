@@ -12,6 +12,7 @@
     "test:unit": "vitest run",
     "contracts:generate": "node --import tsx scripts/export-openapi.ts ../../contracts/web.openapi.json",
     "contracts:check": "node --import tsx scripts/check-openapi.ts ../../contracts/web.openapi.json",
+    "contracts:test:seed": "node --import tsx scripts/seed-contract-test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
