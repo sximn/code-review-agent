@@ -93,6 +93,10 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      dragonfly:
+        image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2
+        ports:
+          - 6379:6379
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
