@@ -48,4 +48,5 @@ prod-check:
 	docker compose -f compose.yaml config --quiet
 
 contracts:
+	cd apps/web && pnpm contracts:generate
 	cd apps/sandbox-controller && uv run --no-sync python -m scripts.export_openapi ../../contracts/sandbox-controller.openapi.json
