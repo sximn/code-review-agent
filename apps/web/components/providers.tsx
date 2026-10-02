@@ -17,6 +17,7 @@ import { multiSessionPlugin } from "@better-auth-ui/core/plugins/multi-session";
 import { organizationPlugin } from "@better-auth-ui/core/plugins/organization";
 import { themePlugin } from "@/lib/auth/theme-plugin";
 import { deleteUserPlugin } from "@/lib/auth/delete-user-plugin";
+import { useEnv } from "./providers/environment-provider";
 
 const normalizeParam = (param: string | string[] | undefined) =>
   (Array.isArray(param) ? param[0] : param)?.replace(/^@/, "") ?? null;
@@ -26,6 +27,7 @@ export function Providers({ children }: { children: ReactNode }) {
   const params = useParams();
   const queryClient = getQueryClient();
   const slug = normalizeParam(params.slug);
+  const { isDev } = useEnv();
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -34,7 +36,10 @@ export function Providers({ children }: { children: ReactNode }) {
           authClient={authClient}
           redirectTo="/dashboard"
           socialProviders={["google", "github"]}
-          emailAndPassword={{ enabled: false, requireEmailVerification: false }}
+          emailAndPassword={{
+            enabled: isDev,
+            requireEmailVerification: false,
+          }}
           navigate={({ to, replace }) =>
             replace ? router.replace(to) : router.push(to)
           }

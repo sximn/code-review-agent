@@ -3,7 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/db/drizzle";
 import * as schema from "@/db/schema";
 import { nextCookies } from "better-auth/next-js";
-import env from "@/lib/environment";
+import { env } from "@/lib/env/environment";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -12,7 +12,7 @@ export const auth = betterAuth({
   }),
   baseURL: env.BETTER_AUTH_URL,
   emailAndPassword: {
-    enabled: false,
+    enabled: env.NODE_ENV === "development",
   },
   socialProviders: {
     google: {

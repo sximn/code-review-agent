@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 
-import env from "@/lib/environment";
+import { env } from "@/lib/env/environment";
 
 export function hasValidWorkerToken(headers: Headers): boolean {
   const received = headers.get("authorization") ?? "";

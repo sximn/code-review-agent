@@ -1,6 +1,10 @@
+import "server-only";
+
 import { z } from "zod";
 
 const envSchema = z.object({
+  NODE_ENV: z.literal(["development", "production"]),
+
   DATABASE_URL: z.url(),
   REDIS_URL: z.url(),
   BETTER_AUTH_URL: z.url(),
@@ -15,6 +19,4 @@ const envSchema = z.object({
   WORKER_API_TOKEN: z.string().min(32),
 });
 
-const env = envSchema.parse(process.env);
-
-export default env;
+export const env = envSchema.parse(process.env);
