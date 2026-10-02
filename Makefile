@@ -27,6 +27,12 @@ ensure-dev-env:
 dev dev-sandbox: ensure-dev-env
 
 dev:
+	@cd apps/worker && uv sync & worker_pid=$$!; \
+	cd apps/sandbox-controller && uv sync & controller_pid=$$!; \
+	status=0; \
+	wait "$$worker_pid" || status=$$?; \
+	wait "$$controller_pid" || status=$$?; \
+	exit "$$status"
 	$(DEV) up -d
 	@set -m; \
 	$(DEV) watch --no-up worker & \
