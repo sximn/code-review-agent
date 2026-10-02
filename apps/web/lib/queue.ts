@@ -1,5 +1,5 @@
 import { getRedis } from "./redis";
-import env from "@/lib/environment";
+import { env } from "@/lib/env/environment";
 
 export type ReviewJobPayload = {
   repository: string;

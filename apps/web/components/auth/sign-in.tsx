@@ -162,7 +162,7 @@ export function SignIn({
         )}
         <CardHeader>
           <CardTitle className="text-xl font-semibold">
-            {localization.auth.signIn}
+            {localization.auth.signIn} - {emailAndPassword.enabled}
           </CardTitle>
         </CardHeader>
 
