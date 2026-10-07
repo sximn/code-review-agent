@@ -36,6 +36,11 @@ class AppConfig(BaseSettings):
     sandbox_controller_token: str = Field(min_length=1)
     worker_concurrency: int = Field(default=2, ge=1, le=16)
 
+    completion_key_prefix: str = Field(min_length=1)
+    completion_dlq_stream: str = Field(min_length=1)
+    completion_ttl_seconds: int = Field(default=604800)
+    completion_max_delivery_attempts: int = Field(default=5)
+
     @model_validator(mode="after")
     def validate_live_agent_config(self) -> "AppConfig":
         if self.agent_mode == "live" and not self.openai_api_key:
