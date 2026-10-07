@@ -1,4 +1,3 @@
-# Existing contract, copied from the supplied model; not a new implementation.
 from datetime import UTC, datetime
 from typing import Any, Literal
 

@@ -1,5 +1,3 @@
-"""Execution sessions checkpoint their output before bounded cleanup."""
-
 import asyncio
 import base64
 import logging
