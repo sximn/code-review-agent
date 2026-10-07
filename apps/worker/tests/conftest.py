@@ -1,8 +1,8 @@
 from collections.abc import Callable
 from typing import Any
 
+import fakeredis
 import pytest
-from fakeredis._clients._async import FakeRedis
 from src.config import AppConfig
 
 ConfigFactory = Callable[..., AppConfig]
@@ -47,8 +47,7 @@ def config(make_config: ConfigFactory) -> AppConfig:
 
 
 @pytest.fixture
-def redis_async_client() -> FakeRedis:
-    import fakeredis
+def redis_async_client() -> fakeredis.FakeAsyncRedis:
 
     redis_client = fakeredis.FakeAsyncRedis(
         server_type="dragonfly",
