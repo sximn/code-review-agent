@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Literal, Self
 
 import httpx
@@ -52,6 +53,7 @@ class ReviewStateClient:
         error: str | None = None,
         usage: dict[str, Any] | None = None,
         cost: dict[str, Any] | None = None,
+        completed_at: datetime | None = None,
     ) -> StoredReviewStatus:
         payload: dict[str, Any] = {
             "status": status,
@@ -68,6 +70,9 @@ class ReviewStateClient:
 
         if cost is not None:
             payload["cost"] = cost
+
+        if completed_at is not None:
+            payload["completed_at"] = completed_at.isoformat()
 
         last_error: Exception | None = None
         for attempt in range(self.max_attempts):

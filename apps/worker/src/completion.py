@@ -36,4 +36,5 @@ class ReviewCompletion(BaseModel):
             "error": self.error,
             "usage": self.usage,
             "cost": self.cost,
+            "completed_at": self.completed_at,
         }
