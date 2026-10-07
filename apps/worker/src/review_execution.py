@@ -223,18 +223,20 @@ class ReviewSession:
         )
 
     async def cleanup(self) -> None:
-        # Optional new setting, with a finite fallback for existing AppConfig.
         seconds = getattr(self.config, "sandbox_cleanup_timeout_seconds", 10.0)
         if seconds <= 0:
             seconds = 10.0
-        if self.sandbox_id is not None:
+
+        try:
+            if self.sandbox_id is not None:
+                try:
+                    async with asyncio.timeout(seconds):
+                        await self.sandbox_client.destroy(self.sandbox_id)
+                except Exception:
+                    logger.exception("Failed to destroy sandbox %s", self.sandbox_id)
+        finally:
             try:
                 async with asyncio.timeout(seconds):
-                    await self.sandbox_client.destroy(self.sandbox_id)
+                    await self.sandbox_client.close()
             except Exception:
-                logger.exception("Failed to destroy sandbox %s", self.sandbox_id)
-        try:
-            async with asyncio.timeout(seconds):
-                await self.sandbox_client.close()
-        except Exception:
-            logger.exception("Failed to close sandbox client")
+                logger.exception("Failed to close sandbox client")

@@ -17,6 +17,8 @@ from .review_execution import ReviewExecutor
 from .review_state_client import (
     PermanentReviewStateError,
     ReviewStateClient,
+    ReviewStateConfigurationError,
+    ReviewStateProtocolError,
     TransientReviewStateError,
 )
 
@@ -44,7 +46,13 @@ class JobProcessor:
                 "Storage unavailable; leaving message pending: %s", message.message_id
             )
             return ProcessingOutcome.RETRY_PENDING
-        # Cancellation and programming errors intentionally propagate.
+        except (ReviewStateConfigurationError, ReviewStateProtocolError):
+            logger.exception(
+                "Web worker API unavailable or incompatible; leaving message pending: %s",
+                message.message_id,
+            )
+            return ProcessingOutcome.RETRY_PENDING
+        # cancellation and programming errors are intentionally left out to propagate
 
     async def _dead_letter(
         self,

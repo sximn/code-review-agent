@@ -33,6 +33,7 @@ class AppConfig(BaseSettings):
 
     sandbox_controller_url: str = Field(min_length=1)
     command_timeout_seconds: int = Field(default=60)
+    sandbox_cleanup_timeout_seconds: float = Field(default=10)
     sandbox_controller_token: str = Field(min_length=1)
     worker_concurrency: int = Field(default=2, ge=1, le=16)
 

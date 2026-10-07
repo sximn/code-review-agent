@@ -1,8 +1,7 @@
 import os
 
-import httpx
 import pytest
-from src.review_state_client import ReviewStateClient
+from src.review_state_client import ReviewStateClient, ReviewStateConfigurationError
 
 REVIEW_ID = "22222222-2222-4222-8222-222222222222"
 
@@ -40,8 +39,8 @@ async def test_review_state_client_matches_live_web_contract() -> None:
 async def test_review_state_client_authentication_matches_live_web_contract() -> None:
     base_url, _ = contract_test_settings()
 
-    with pytest.raises(httpx.HTTPStatusError) as error:
+    with pytest.raises(ReviewStateConfigurationError) as error:
         async with ReviewStateClient(base_url, "invalid-token", max_attempts=1) as client:
             await client.set_state(REVIEW_ID, "running")
 
-    assert error.value.response.status_code == 401
+    assert error.value.status_code == 401

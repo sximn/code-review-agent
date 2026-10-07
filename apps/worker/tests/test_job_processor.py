@@ -19,6 +19,8 @@ from src.review_execution import ReviewExecutor, ReviewSession
 from src.review_state_client import (
     PermanentReviewStateError,
     ReviewStateClient,
+    ReviewStateConfigurationError,
+    ReviewStateProtocolError,
     TransientReviewStateError,
 )
 
@@ -229,6 +231,24 @@ class TestJobProcessor:
         assert await processor.process(message) == ProcessingOutcome.RETRY_PENDING
 
         executor.open.assert_not_called()
+        assert_not_finalized(store)
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            ReviewStateConfigurationError("HTTP 401", status_code=401),
+            ReviewStateProtocolError("invalid response"),
+        ],
+    )
+    async def test_systemic_web_failure_leaves_pending_without_finalizing(
+        self, processor, message, state, store, executor, error
+    ):
+        state.set_state.side_effect = error
+
+        assert await processor.process(message) == ProcessingOutcome.RETRY_PENDING
+
+        executor.open.assert_not_called()
+        store.record_delivery_failure.assert_not_awaited()
         assert_not_finalized(store)
 
     async def test_permanent_start_failure_goes_to_dlq_without_execution(
