@@ -1,4 +1,5 @@
 import json
+from dataclasses import dataclass
 from typing import Any, cast
 
 from openai import AsyncOpenAI
@@ -11,6 +12,7 @@ from openai.types.chat.completion_create_params import (
     CompletionCreateParamsNonStreaming,
 )
 
+from ..config import SimulationScenario
 from ..sandbox_client import SandboxClient
 from .schema import PRMetadata, Review
 from .usage import UsageAccumulator, record_chat_completion_usage
@@ -277,6 +279,12 @@ SANDBOX_TOOL: ChatCompletionFunctionToolParam = {
 MAX_TOOL_OUTPUT_CHARS = 40_000
 
 
+@dataclass
+class SimulationProps:
+    simulation_base_url: str
+    simulation_scenario: SimulationScenario
+
+
 def _validate_tool_arguments(arguments: str) -> tuple[list[str], str]:
     parsed = json.loads(arguments)
     command = parsed.get("command")
@@ -322,8 +330,29 @@ async def run_agent_review(
     sandbox: SandboxClient | None = None,
     sandbox_id: str | None = None,
     usage_accumulator: UsageAccumulator,
+    simulation_props: SimulationProps | None,
 ) -> Review:
-    async with AsyncOpenAI(api_key=api_key) as client:
+    client_options: dict[str, Any] = {}
+    if simulation_props is not None:
+        from urllib.parse import urlparse
+
+        url = urlparse(simulation_props.simulation_base_url)
+        if url.scheme != "http" or url.hostname not in {
+            "fake-openai",
+            "localhost",
+            "127.0.0.1",
+            "::1",
+        }:
+            raise ValueError("Simulation requires a local fake OpenAI URL")
+        client_options = {
+            "base_url": simulation_props.simulation_base_url,
+            "max_retries": 0,
+            "default_headers": {
+                "X-Simulation-Scenario": simulation_props.simulation_scenario
+            },
+        }
+        api_key = "simulation-not-a-real-key"
+    async with AsyncOpenAI(api_key=api_key, **client_options) as client:
         return await _run_agent_review(
             client,
             pr_metadata,

@@ -18,7 +18,7 @@ ensure-dev-env:
 			printf '\033[0;38;5;240;49mWould copy \033[36m.env.example\033[0m to \033[32m%s\033[0m\n' "$(DEV_ENV)"; \
 		else \
 			cp .env.example "$(DEV_ENV)"; \
-			printf '\033[0;38;5;240;49mCreated %s from .env.example\033[0m\n' "$(DEV_ENV)"; \
+			printf '\033[0;38;5;240;49mCreated \033[2;38;5;154m%s\033[0;38;5;240;49m from .env.example\033[0m\n' "$(DEV_ENV)"; \
 		fi; \
 	else \
 		printf "\033[0;38;5;240;49mUsing existing \033[36m%s\033[0m \033[0;38;5;240;49mfor compose stack\033[0m\n" "$(DEV_ENV)"; \
@@ -54,7 +54,7 @@ dev-sandbox:
 	$(DEV) --profile sandbox up --build --watch
 
 dev-down:
-	$(DEV) down
+	$(DEV) --profile "*" down --remove-orphans
 
 migrate:
 	$(DEV) build migrate

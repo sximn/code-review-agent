@@ -15,21 +15,31 @@ from src.repository import (
 
 parse_handle_testdata = [
     (
-        {"repository": "sximn/code-review-agent", "pull_request": 2},
+        {
+            "repository": "sximn/code-review-agent",
+            "pull_request": 2,
+            "visibility": "public",
+        },
         {
             "repository_handle": "sximn/code-review-agent",
             "pull_request_number": 2,
             "repository_owner": "sximn",
             "repository_name": "code-review-agent",
+            "visibility": "public",
         },
     ),
     (
-        {"repository": "random/name.with-dots", "pull_request": 42},
+        {
+            "repository": "random/name.with-dots",
+            "pull_request": 42,
+            "visibility": "public",
+        },
         {
             "repository_handle": "random/name.with-dots",
             "pull_request_number": 42,
             "repository_owner": "random",
             "repository_name": "name.with-dots",
+            "visibility": "public",
         },
     ),
 ]
@@ -123,6 +133,7 @@ async def test_github_get_translates_network_error():
             await _github_get(
                 client,
                 "https://api.github.com/example",
+                visibility="public",
                 token=None,
                 accept="application/vnd.github+json",
                 not_found_message="Not found.",
@@ -172,7 +183,7 @@ async def test_fetch_pr_metadata():
         result = await fetch_pr_metadata(
             client,
             payload=ReviewRequestPayload.model_validate(
-                {"repository": REPO, "pull_request": PR}
+                {"repository": REPO, "pull_request": PR, "visibility": "public"}
             ),
         )
 

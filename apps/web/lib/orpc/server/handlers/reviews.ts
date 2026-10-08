@@ -64,6 +64,7 @@ const createReview = authed.reviews.create.handler(
     try {
       await enqueueReviewJob(reviewId, {
         repository: connectedRepository.fullName,
+        visibility: connectedRepository.isPrivate ? "private" : "public",
         pull_request: input.pullRequestNumber,
       });
     } catch (error) {

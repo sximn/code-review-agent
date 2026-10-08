@@ -7,21 +7,28 @@ from typing import Any
 
 import httpx
 
-from .agent.agent import run_agent_review, run_mock_agent_review
+from .agent.agent import SimulationProps, run_agent_review, run_mock_agent_review
 from .agent.pricing import estimate_review_cost, mock_review_cost
 from .agent.schema import PRMetadata, ReviewCost, ReviewUsage
 from .agent.usage import UsageAccumulator
 from .completion import ReviewCompletion
 from .config import AppConfig
-from .repository import ReviewRequestPayload, fetch_pr_metadata, uriEncode
+from .repository import (
+    RepoVisibility,
+    ReviewRequestPayload,
+    fetch_pr_metadata,
+    uriEncode,
+)
 from .sandbox_client import SandboxClient
 
 logger = logging.getLogger(__name__)
 
 
-def _git_environment(github_token: str | None) -> dict[str, str]:
+def _git_environment(
+    visibility: RepoVisibility, github_token: str | None
+) -> dict[str, str]:
     environment = {"GIT_TERMINAL_PROMPT": "0"}
-    if not github_token:
+    if visibility == "public" or not github_token:
         return environment
     credentials = base64.b64encode(f"x-access-token:{github_token}".encode()).decode()
     environment.update(
@@ -98,7 +105,7 @@ class ReviewSession:
             f"https://github.com/{uriEncode(payload.repository_owner)}/"
             f"{uriEncode(payload.repository_name)}.git"
         )
-        git_environment = _git_environment(config.github_token)
+        git_environment = _git_environment(payload.visibility, config.github_token)
         sandbox_id: str | None = None
         result: dict[str, Any] | None = None
         failure: str | None = None
@@ -184,17 +191,25 @@ class ReviewSession:
                     review = await run_mock_agent_review(pr_metadata)
                     cost = mock_review_cost()
                 else:
-                    if not config.openai_api_key:
+                    simulation = config.agent_mode == "simulation"
+                    if not simulation and not config.openai_api_key:
                         raise RuntimeError("OPENAI_API_KEY is missing.")
+
                     usage_accumulator = UsageAccumulator()
                     review = await run_agent_review(
                         pr_metadata,
                         config.model,
-                        config.openai_api_key,
+                        config.openai_api_key or "simulation-not-a-real-key",
                         config.max_steps,
                         sandbox=sandbox_client,
                         sandbox_id=sandbox_id,
                         usage_accumulator=usage_accumulator,
+                        simulation_props=SimulationProps(
+                            simulation_base_url=config.simulation_base_url,
+                            simulation_scenario=config.simulation_scenario,
+                        )
+                        if simulation
+                        else None,
                     )
                 result = review.model_dump(mode="json")
         except TimeoutError:
