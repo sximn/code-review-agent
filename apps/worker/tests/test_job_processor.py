@@ -43,7 +43,13 @@ class TestJobProcessor:
             {
                 "job_id": "job-1",
                 "type": "review",
-                "payload": json.dumps({"repository": "owner/repo", "pull_request": 2}),
+                "payload": json.dumps(
+                    {
+                        "repository": "owner/repo",
+                        "pull_request": 2,
+                        "visibility": "public",
+                    }
+                ),
             },
         )
 

@@ -85,6 +85,7 @@ def review_execution(monkeypatch: pytest.MonkeyPatch, make_config) -> SimpleName
     payload = SimpleNamespace(
         repository_owner="owner",
         repository_name="repo",
+        visibility="public",
     )
     metadata = SimpleNamespace(
         title="title",
