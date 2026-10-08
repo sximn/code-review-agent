@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
+import fakeredis
 import pytest
 from src.config import AppConfig
 
@@ -30,6 +31,8 @@ def make_config() -> ConfigFactory:
             command_timeout_seconds=60,
             sandbox_controller_token="sandbox-secret",
             worker_concurrency=2,
+            completion_dlq_stream="dlq",
+            completion_key_prefix="stream",
         )
         values = cfg.model_dump()
         values.update(overrides)
@@ -41,3 +44,15 @@ def make_config() -> ConfigFactory:
 @pytest.fixture
 def config(make_config: ConfigFactory) -> AppConfig:
     return make_config()
+
+
+@pytest.fixture
+def redis_async_client() -> fakeredis.FakeAsyncRedis:
+
+    redis_client = fakeredis.FakeAsyncRedis(
+        server_type="dragonfly",
+        decode_responses=True,
+        socket_connect_timeout=5,
+        socket_timeout=15,
+    )
+    return redis_client

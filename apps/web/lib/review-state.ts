@@ -50,14 +50,18 @@ export async function applyReviewState(
             status: input.status,
             result: input.result,
             error: null,
-            finishedAt: new Date(),
+            finishedAt: input.completed_at
+              ? new Date(input.completed_at)
+              : new Date(),
             updatedAt: new Date(),
           }
         : {
             status: input.status,
             result: null,
             error: input.error,
-            finishedAt: new Date(),
+            finishedAt: input.completed_at
+              ? new Date(input.completed_at)
+              : new Date(),
             updatedAt: new Date(),
           };
 

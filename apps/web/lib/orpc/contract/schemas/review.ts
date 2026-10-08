@@ -93,6 +93,7 @@ export const reviewStateSchema = z.discriminatedUnion("status", [
       result: reviewResultSchema,
       usage: reviewUsageSchema.optional(),
       cost: reviewCostSchema.optional(),
+      completed_at: z.iso.datetime({ offset: true }).optional(),
     })
     .strict(),
 
@@ -103,6 +104,7 @@ export const reviewStateSchema = z.discriminatedUnion("status", [
       error: z.string().min(1).max(2000),
       usage: reviewUsageSchema.optional(),
       cost: reviewCostSchema.optional(),
+      completed_at: z.iso.datetime({ offset: true }).optional(),
     })
     .strict(),
 ]);
