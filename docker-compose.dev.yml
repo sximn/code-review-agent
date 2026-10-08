@@ -1,4 +1,19 @@
 services:
+  fake-openai:
+    build:
+      context: ./apps/worker
+      target: dev
+    command: ["python", "-m", "src.agent.fake_openai"]
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "127.0.0.1:8081:8080"
+
   web:
     profiles: ["container-web"]
 
@@ -18,12 +33,16 @@ services:
         - action: rebuild
           path: ./apps/worker/Dockerfile
     depends_on: !override
+      fake-openai:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       dragonfly:
         condition: service_healthy
     environment:
       WEB_SERVICE_URL: http://host.docker.internal:3000
+      SIMULATION_BASE_URL: http://fake-openai:8080/v1
+      SIMULATION_SCENARIO: ${SIMULATION_SCENARIO:-success}
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

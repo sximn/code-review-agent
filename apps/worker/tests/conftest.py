@@ -1,9 +1,13 @@
 from collections.abc import Callable
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
+from unittest.mock import AsyncMock
 
 import fakeredis
 import pytest
 from src.config import AppConfig
+from src.review_execution import ReviewExecutor
+from src.sandbox_client import SandboxClient
 
 ConfigFactory = Callable[..., AppConfig]
 
@@ -56,3 +60,65 @@ def redis_async_client() -> fakeredis.FakeAsyncRedis:
         socket_timeout=15,
     )
     return redis_client
+
+
+@pytest.fixture
+def review_execution(monkeypatch: pytest.MonkeyPatch, make_config) -> SimpleNamespace:
+    config: AppConfig = make_config(
+        github_token=None,
+        job_timeout_seconds=1,
+        max_repo_size_bytes=1000,
+        agent_mode="mock",
+        sandbox_cleanup_timeout_seconds=0.02,
+    )
+    sandbox = SimpleNamespace(
+        create=AsyncMock(return_value="sandbox-1"),
+        exec=AsyncMock(
+            return_value={
+                "exit_code": 0,
+                "stdout": "100 /workspace/repo",
+            }
+        ),
+        destroy=AsyncMock(),
+        close=AsyncMock(),
+    )
+    payload = SimpleNamespace(
+        repository_owner="owner",
+        repository_name="repo",
+    )
+    metadata = SimpleNamespace(
+        title="title",
+        description="body",
+        diff="diff",
+        base_sha="base",
+        head_sha="head",
+    )
+    review = SimpleNamespace(
+        model_dump=lambda **kwargs: {"summary": "OK"},
+    )
+    fetch_metadata = AsyncMock(return_value=metadata)
+    run_agent = AsyncMock(return_value=review)
+
+    monkeypatch.setattr(
+        "src.review_execution.fetch_pr_metadata",
+        fetch_metadata,
+    )
+    monkeypatch.setattr(
+        "src.review_execution.run_mock_agent_review",
+        run_agent,
+    )
+    monkeypatch.setattr(
+        "src.review_execution.mock_review_cost",
+        lambda *args, **kwargs: None,
+    )
+
+    return SimpleNamespace(
+        config=config,
+        sandbox=sandbox,
+        executor=ReviewExecutor(
+            config, AsyncMock(), lambda: cast(SandboxClient, sandbox)
+        ),
+        payload=payload,
+        metadata=fetch_metadata,
+        agent=run_agent,
+    )

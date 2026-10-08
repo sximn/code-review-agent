@@ -3,6 +3,17 @@ from typing import Literal
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+AgentMode = Literal["live", "mock", "simulation"]
+SimulationScenario = Literal[
+    "success",
+    "findings",
+    "api-error",
+    "error-after-tool",
+    "invalid-output",
+    "missing-usage",
+    "step-limit",
+]
+
 
 class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(
@@ -12,7 +23,9 @@ class AppConfig(BaseSettings):
         extra="ignore",
     )
 
-    agent_mode: Literal["live", "mock"] = Field(default="mock")
+    agent_mode: AgentMode = Field(default="mock")
+    simulation_base_url: str = "http://fake-openai:8080/v1"
+    simulation_scenario: SimulationScenario = "success"
     openai_api_key: str | None = None
     model: str = Field(default="gpt-4o-mini", min_length=1)
     github_token: str | None = None
