@@ -5,6 +5,8 @@ from typing import Any, Literal
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+RepoVisibility = Literal["public", "private"]
+
 
 class GitHubError(Exception):
     pass
@@ -74,13 +76,15 @@ class ReviewRequestPayload(BaseModel):
 API_ROOT = "https://api.github.com"
 
 
-def _github_headers(token: str | None, accept: str) -> dict[str, str]:
+def _github_headers(
+    visibility: RepoVisibility, token: str | None, accept: str
+) -> dict[str, str]:
     headers = {
         "Accept": accept,
         "X-GitHub-Api-Version": "2026-03-10",
     }
 
-    if token:
+    if visibility == "private":
         headers["Authorization"] = f"Bearer {token}"
 
     return headers
@@ -89,7 +93,7 @@ def _github_headers(token: str | None, accept: str) -> dict[str, str]:
 async def _validate_token(client: httpx.AsyncClient, token: str) -> None:
     response = await client.get(
         f"{API_ROOT}/user",
-        headers=_github_headers(token, "application/vnd.github+json"),
+        headers=_github_headers("private", token, "application/vnd.github+json"),
     )
 
     if response.status_code == 401:
@@ -107,6 +111,7 @@ async def _github_get(
     client: httpx.AsyncClient,
     url: str,
     *,
+    visibility: RepoVisibility,
     token: str | None,
     accept: str,
     not_found_message: str,
@@ -114,7 +119,7 @@ async def _github_get(
     try:
         response = await client.get(
             url,
-            headers=_github_headers(token, accept),
+            headers=_github_headers(visibility, token, accept),
         )
     except httpx.RequestError as error:
         raise GitHubError(f"Could not reach GitHub: {error}") from error
@@ -138,6 +143,53 @@ async def _github_get(
     return response
 
 
+async def _fetch_ensure_repo(
+    github_client: httpx.AsyncClient,
+    payload: ReviewRequestPayload,
+    token: str | None = None,
+):
+    repo_url = (
+        f"{API_ROOT}/repos/"
+        f"{uriEncode(payload.repository_owner)}/"
+        f"{uriEncode(payload.repository_name)}"
+    )
+
+    # attempt public access without authentication
+    repo_response = await github_client.get(
+        repo_url,
+        headers={"Accept": "application/vnd.github+json"},
+    )
+    request_token = None
+
+    if repo_response.status_code == 404:
+        if not token:
+            raise GitHubError(
+                "The repository does not exist or requires authentication."
+            )
+
+        await _validate_token(github_client, token)
+        request_token = token
+
+        repo_response = await _github_get(
+            github_client,
+            repo_url,
+            visibility="private",
+            token=request_token,
+            accept="application/vnd.github+json",
+            not_found_message=(
+                "The repository does not exist or is not accessible with this token."
+            ),
+        )
+    else:
+        # Use your existing GitHub error translation here if needed.
+        repo_response.raise_for_status()
+
+    repo_data = repo_response.json()
+    visibility: RepoVisibility = "private" if repo_data["private"] else "public"
+
+    return (repo_url, visibility)
+
+
 def uriEncode(part: str) -> str:
     return urllib.parse.quote(part, safe="~()*!.'-")
 
@@ -147,26 +199,8 @@ async def fetch_pr_metadata(
     payload: ReviewRequestPayload,
     token: str | None = None,
 ) -> PullRequestMetadata:
-    if token:
-        await _validate_token(github_client, token)
 
-    # check if the repository is visible to this request
-    repo_url = f"{API_ROOT}/repos/{uriEncode(payload.repository_owner)}/{uriEncode(payload.repository_name)}"
-
-    repo_response = await _github_get(
-        github_client,
-        repo_url,
-        token=token,
-        accept="application/vnd.github+json",
-        not_found_message=(
-            "The repository does not exist or is not accessible with this token."
-            if token
-            else "The repository does not exist or requires authentication."
-        ),
-    )
-
-    repo_data = repo_response.json()
-    visibility = "private" if repo_data["private"] else "public"
+    repo_url, visibility = await _fetch_ensure_repo(github_client, payload, token)
 
     # fetch PR metadata: title + description
     pr_url = f"{repo_url}/pulls/{payload.pull_request_number}"
@@ -174,6 +208,7 @@ async def fetch_pr_metadata(
     metadata_response = await _github_get(
         github_client,
         pr_url,
+        visibility=visibility,
         token=token,
         accept="application/vnd.github+json",
         not_found_message=(
@@ -184,6 +219,7 @@ async def fetch_pr_metadata(
     diff_response = await _github_get(
         github_client,
         pr_url,
+        visibility=visibility,
         token=token,
         accept="application/vnd.github.v3.diff",
         not_found_message=f"Pull request #{payload.pull_request_number} does not exist.",
