@@ -54,7 +54,7 @@ dev-sandbox:
 	$(DEV) --profile sandbox up --build --watch
 
 dev-down:
-	$(DEV) down
+	$(DEV) --profile "*" down --remove-orphans
 
 migrate:
 	$(DEV) build migrate
