@@ -1,8 +1,11 @@
 import { getRedis } from "./redis";
 import { env } from "@/lib/env/environment";
 
+export type RepoVisiblity = "private" | "public";
+
 export type ReviewJobPayload = {
   repository: string;
+  visibility: RepoVisiblity;
   pull_request: number;
 };
 

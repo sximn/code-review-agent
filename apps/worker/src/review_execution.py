@@ -13,15 +13,22 @@ from .agent.schema import PRMetadata, ReviewCost, ReviewUsage
 from .agent.usage import UsageAccumulator
 from .completion import ReviewCompletion
 from .config import AppConfig
-from .repository import ReviewRequestPayload, fetch_pr_metadata, uriEncode
+from .repository import (
+    RepoVisibility,
+    ReviewRequestPayload,
+    fetch_pr_metadata,
+    uriEncode,
+)
 from .sandbox_client import SandboxClient
 
 logger = logging.getLogger(__name__)
 
 
-def _git_environment(github_token: str | None) -> dict[str, str]:
+def _git_environment(
+    visibility: RepoVisibility, github_token: str | None
+) -> dict[str, str]:
     environment = {"GIT_TERMINAL_PROMPT": "0"}
-    if not github_token:
+    if visibility == "public" or not github_token:
         return environment
     credentials = base64.b64encode(f"x-access-token:{github_token}".encode()).decode()
     environment.update(
@@ -98,7 +105,7 @@ class ReviewSession:
             f"https://github.com/{uriEncode(payload.repository_owner)}/"
             f"{uriEncode(payload.repository_name)}.git"
         )
-        git_environment = _git_environment(config.github_token)
+        git_environment = _git_environment(payload.visibility, config.github_token)
         sandbox_id: str | None = None
         result: dict[str, Any] | None = None
         failure: str | None = None

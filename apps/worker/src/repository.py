@@ -37,6 +37,7 @@ class ReviewRequestPayload(BaseModel):
     repository_owner: str
     repository_name: str
     pull_request_number: int = Field(ge=1, validation_alias="pull_request")
+    visibility: RepoVisibility = Field()
 
     @model_validator(mode="before")
     @classmethod
