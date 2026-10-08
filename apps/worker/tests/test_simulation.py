@@ -5,7 +5,7 @@ import pytest
 from src.agent.fake_openai import Handler
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def fake_openai_url():
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = Thread(target=server.serve_forever, daemon=True)
