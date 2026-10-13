@@ -28,7 +28,7 @@ export default function Page() {
                 </p>
                 <a
                   href="/dashboard"
-                  className="group relative isolate inline-flex w-max shrink-0 items-center gap-3 overflow-hidden rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold whitespace-nowrap text-slate-900 shadow-sm transition-[border-color,box-shadow,transform] duration-300 hover:border-slate-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-3 focus-visible:outline-none motion-reduce:transform-none motion-reduce:transition-none dark:border-white/15 dark:bg-white/80 dark:text-black dark:hover:border-white/25 dark:hover:bg-white/85"
+                  className="group relative isolate inline-flex w-max shrink-0 items-center gap-3 overflow-hidden rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm font-semibold whitespace-nowrap text-slate-900 shadow-sm transition-[border-color,box-shadow,transform] duration-300 hover:border-slate-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-3 focus-visible:outline-none motion-reduce:transform-none motion-reduce:transition-none dark:border-white/15 dark:bg-white/80 dark:text-black dark:hover:border-white/25 dark:hover:bg-white/85"
                 >
                   <span>Start reviewing</span>
 
