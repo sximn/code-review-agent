@@ -514,6 +514,7 @@ export function RepositoryRow({
                                 createReviewMutation.mutate({
                                   repositoryId: repo.id,
                                   pullRequestNumber: pullRequest.number,
+                                  headSha: pullRequest.headSha,
                                 })
                               }
                             >

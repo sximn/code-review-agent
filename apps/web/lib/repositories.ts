@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GIT_OBJECT_ID_PATTERN } from "./repository-pull-request-utils";
+import { commitShaSchema } from "@/lib/orpc/contract/schemas/repository";
 
 export type PublicRepository = {
   fullName: string;
@@ -13,7 +13,7 @@ const pullRequestSchema = z
     body: z.string().nullable(),
     updated_at: z.iso.datetime(),
     head: z.object({
-      sha: z.string().regex(new RegExp(GIT_OBJECT_ID_PATTERN)),
+      sha: commitShaSchema,
     }),
   })
   .transform((pr) => ({

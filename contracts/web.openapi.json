@@ -1423,10 +1423,15 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "headSha": {
+                    "type": "string",
+                    "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
                   }
                 },
                 "required": [
-                  "pullRequestNumber"
+                  "pullRequestNumber",
+                  "headSha"
                 ]
               }
             }
@@ -1559,6 +1564,17 @@
                   },
                   "cost": {
                     "$ref": "#/components/schemas/ReviewCost"
+                  },
+                  "reviewed_head_sha": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "completed_at": {
                     "type": "string",

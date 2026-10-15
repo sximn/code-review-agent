@@ -6,6 +6,7 @@ import {
   repositoryReviewSchema,
   repositoryReviewWithUsageSchema,
 } from "./schemas/review";
+import { commitShaSchema } from "./schemas/repository";
 
 const listReviews = authenticated
   .errors({
@@ -50,6 +51,7 @@ const createReview = authenticated
       .object({
         repositoryId: z.uuid(),
         pullRequestNumber: z.int().positive(),
+        headSha: commitShaSchema,
       })
       .strict(),
   )

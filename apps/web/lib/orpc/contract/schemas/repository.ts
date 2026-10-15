@@ -6,6 +6,10 @@ export const repositoryNameSchema = z
   .trim()
   .regex(/^[^/\s]+\/[^/\s]+$/, "Use owner/repository format");
 
+export const commitShaSchema = z
+  .string()
+  .regex(new RegExp(GIT_OBJECT_ID_PATTERN));
+
 export const publicRepositorySchema = z
   .object({
     fullName: repositoryNameSchema,
@@ -24,7 +28,7 @@ export const connectedRepositorySchema = z
 export const pullRequestSchema = z
   .object({
     number: z.int().positive(),
-    headSha: z.string().regex(new RegExp(GIT_OBJECT_ID_PATTERN)),
+    headSha: commitShaSchema,
     url: z.url(),
     title: z.string(),
     description: z.string(),

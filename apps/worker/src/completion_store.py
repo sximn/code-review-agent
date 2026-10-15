@@ -6,7 +6,13 @@ from pydantic import ValidationError
 from redis.asyncio import Redis
 from redis.exceptions import RedisError, WatchError
 
-from .completion import ReviewCompletion
+from .completion import (
+    ReviewCompletion,
+    ReviewCompletionV1,
+    ReviewCompletionV2,
+    StoredReviewCompletion,
+    completion_adapter,
+)
 from .config import AppConfig
 from .processing_types import InvalidCheckpointError, QueueMessage, StorageError
 
@@ -70,16 +76,16 @@ class CompletionStore:
         return f"{self.config.completion_key_prefix}:{job_id}"
 
     @staticmethod
-    def _decode(raw: str | bytes) -> ReviewCompletion:
+    def _decode(raw: str | bytes) -> ReviewCompletionV1 | ReviewCompletionV2:
         try:
-            return ReviewCompletion.model_validate_json(raw)
+            return completion_adapter.validate_json(raw)
         except ValidationError as exc:
             text = (
                 raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
             )
             raise InvalidCheckpointError(text) from exc
 
-    async def load(self, job_id: str) -> ReviewCompletion | None:
+    async def load(self, job_id: str) -> ReviewCompletionV1 | ReviewCompletionV2 | None:
         try:
             raw = await self.redis.get(self._key(job_id))
         except RedisError as exc:
@@ -95,7 +101,7 @@ class CompletionStore:
 
     async def record_delivery_failure(
         self, job_id: str, reason: str
-    ) -> ReviewCompletion:
+    ) -> ReviewCompletionV1 | ReviewCompletionV2:
         key = self._key(job_id)
         # WATCH preserves JSON/Pydantic serialization, including nested arrays,
         # while preventing lost concurrent attempt increments.
@@ -106,12 +112,15 @@ class CompletionStore:
                     raw = await pipe.get(key)
                     if raw is None:
                         raise StorageError(f"Checkpoint for {job_id} disappeared")
+
                     completion = self._decode(raw)
                     completion.delivery_attempts += 1
                     completion.last_delivery_error = reason[:2000]
+
                     pipe.multi()
                     pipe.set(key, completion.model_dump_json())
                     await pipe.execute()
+
                     return completion
             except WatchError:
                 continue
@@ -164,7 +173,7 @@ class CompletionStore:
         job_id: str | None,
         phase: str,
         reason: str,
-        completion: ReviewCompletion | None = None,
+        completion: StoredReviewCompletion | None = None,
         raw_completion: str | None = None,
     ) -> None:
         entry = {

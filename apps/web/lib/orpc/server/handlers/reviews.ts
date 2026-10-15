@@ -92,6 +92,7 @@ const createReview = authed.reviews.create.handler(
         repository: connectedRepository.fullName,
         visibility: connectedRepository.isPrivate ? "private" : "public",
         pull_request: input.pullRequestNumber,
+        head_sha: input.headSha,
       });
     } catch (error) {
       console.error("Could not enqueue review", error);
