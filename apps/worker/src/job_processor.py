@@ -126,7 +126,6 @@ class JobProcessor:
         except ValidationError:
             completion = ReviewCompletion(
                 status="failed",
-                reviewed_head_sha=raw_payload.get("head_sha"),
                 error="The queued review payload is invalid.",
             )
             await self.store.save(job_id, completion)
