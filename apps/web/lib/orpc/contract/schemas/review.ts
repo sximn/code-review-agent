@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { commitShaSchema } from "./repository";
 
 const count = z.int().nonnegative();
 
@@ -93,6 +94,7 @@ export const reviewStateSchema = z.discriminatedUnion("status", [
       result: reviewResultSchema,
       usage: reviewUsageSchema.optional(),
       cost: reviewCostSchema.optional(),
+      reviewed_head_sha: commitShaSchema.optional(),
       completed_at: z.iso.datetime({ offset: true }).optional(),
     })
     .strict(),
@@ -104,6 +106,7 @@ export const reviewStateSchema = z.discriminatedUnion("status", [
       error: z.string().min(1).max(2000),
       usage: reviewUsageSchema.optional(),
       cost: reviewCostSchema.optional(),
+      reviewed_head_sha: commitShaSchema.optional(),
       completed_at: z.iso.datetime({ offset: true }).optional(),
     })
     .strict(),
@@ -127,6 +130,8 @@ export const repositoryReviewSchema = z
     id: z.uuid(),
     repositoryId: z.uuid(),
     pullRequestNumber: z.number().int(),
+    pullRequestVersionId: z.uuid(),
+    headSha: commitShaSchema.nullable(),
     status: reviewStatusSchema,
     result: reviewResultSchema.nullable(),
     error: z.string().nullable(),

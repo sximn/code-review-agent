@@ -7,6 +7,7 @@ export type ReviewJobPayload = {
   repository: string;
   visibility: RepoVisiblity;
   pull_request: number;
+  head_sha: string;
 };
 
 export async function enqueueReviewJob(

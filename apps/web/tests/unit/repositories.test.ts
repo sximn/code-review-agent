@@ -1,8 +1,10 @@
-// @vitest-environment node
-
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getOpenPullRequests, getPublicRepository } from "@/lib/repositories";
+import {
+  getOpenPullRequests,
+  getPublicRepository,
+  getPullRequest,
+} from "@/lib/repositories";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -67,6 +69,7 @@ describe("getOpenPullRequests", () => {
         [
           {
             number: 42,
+            head: { sha: "a".repeat(40) },
             html_url: "https://github.com/owner/repository/pull/42",
             title: "Improve review handling",
             body: null,
@@ -91,6 +94,7 @@ describe("getOpenPullRequests", () => {
       pullRequests: [
         {
           number: 42,
+          headSha: "a".repeat(40),
           url: "https://github.com/owner/repository/pull/42",
           title: "Improve review handling",
           description: "",
@@ -134,5 +138,52 @@ describe("getOpenPullRequests", () => {
     await expect(
       getOpenPullRequests("owner/repository", { page: 1, perPage: 25 }),
     ).rejects.toThrow();
+  });
+});
+
+describe("getPullRequest", () => {
+  it("resolves the current head from a fresh server request", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        number: 42,
+        html_url: "https://github.com/owner/repository/pull/42",
+        title: "Updated PR",
+        body: null,
+        updated_at: "2026-10-13T10:00:00Z",
+        head: { sha: "b".repeat(40) },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    expect((await getPullRequest("owner/repository", 42))?.headSha).toBe(
+      "b".repeat(40),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.github.com/repos/owner/repository/pulls/42",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+  it("returns null for a missing PR", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(Response.json({}, { status: 404 })),
+    );
+    expect(await getPullRequest("owner/repository", 42)).toBeNull();
+  });
+  it("rejects a missing SHA instead of scheduling an unversioned review", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        Response.json({
+          number: 42,
+          html_url: "https://github.com/owner/repository/pull/42",
+          title: "Invalid",
+          body: null,
+          updated_at: "2026-10-13T10:00:00Z",
+        }),
+      ),
+    );
+    await expect(getPullRequest("owner/repository", 42)).rejects.toThrow();
   });
 });

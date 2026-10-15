@@ -69,6 +69,7 @@ class ReviewStateClient:
         error: str | None = None,
         usage: dict[str, Any] | None = None,
         cost: dict[str, Any] | None = None,
+        reviewed_head_sha: str | None = None,
         completed_at: datetime | None = None,
     ) -> StoredReviewStatus:
         payload: dict[str, Any] = {
@@ -86,6 +87,9 @@ class ReviewStateClient:
 
         if cost is not None:
             payload["cost"] = cost
+
+        if reviewed_head_sha is not None:
+            payload["reviewed_head_sha"] = reviewed_head_sha
 
         if completed_at is not None:
             payload["completed_at"] = completed_at.isoformat()

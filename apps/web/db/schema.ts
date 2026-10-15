@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { ReviewResult } from "@/lib/orpc/contract/schemas/review";
 import {
   pgTable,
@@ -10,7 +11,9 @@ import {
   jsonb,
   uniqueIndex,
   numeric,
+  check,
 } from "drizzle-orm/pg-core";
+import { GIT_OBJECT_ID_PATTERN } from "@/lib/repository-pull-request-utils";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -111,14 +114,58 @@ export const reviewStatusEnum = pgEnum("review_status", [
   "finished",
 ]);
 
-export const review = pgTable(
-  "review",
+export const pullRequest = pgTable(
+  "pull_request",
   {
     id: text("id").primaryKey(),
     repositoryId: text("repository_id")
       .notNull()
       .references(() => repository.id, { onDelete: "cascade" }),
-    pullRequestNumber: integer("pull_request_number").notNull(),
+    number: integer("number").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("pull_request_repository_number_idx").on(
+      table.repositoryId,
+      table.number,
+    ),
+    check("pull_request_number_positive", sql`${table.number} > 0`),
+  ],
+);
+
+export const pullRequestVersion = pgTable(
+  "pull_request_version",
+  {
+    id: text("id").primaryKey(),
+    pullRequestId: text("pull_request_id")
+      .notNull()
+      .references(() => pullRequest.id, { onDelete: "cascade" }),
+    // NULL is reserved for migrated reviews whose original SHA was never stored.
+    headSha: text("head_sha"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("pull_request_version_pr_sha_idx").on(
+      table.pullRequestId,
+      table.headSha,
+    ),
+    uniqueIndex("pull_request_version_unknown_sha_idx")
+      .on(table.pullRequestId)
+      .where(sql`${table.headSha} is null`),
+    check(
+      "pull_request_version_head_sha_valid",
+      sql`${table.headSha} is null or ${table.headSha} ~ '${sql.raw(GIT_OBJECT_ID_PATTERN)}'`,
+    ),
+  ],
+);
+
+export const review = pgTable(
+  "review",
+  {
+    id: text("id").primaryKey(),
+    pullRequestVersionId: text("pull_request_version_id")
+      .notNull()
+      .references(() => pullRequestVersion.id, { onDelete: "cascade" }),
     status: reviewStatusEnum().default("scheduled").notNull(),
     result: jsonb("result").$type<ReviewResult>(),
     error: text("error"),
@@ -127,7 +174,9 @@ export const review = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("review_repository_id_idx").on(table.repositoryId)],
+  (table) => [
+    index("review_pull_request_version_id_idx").on(table.pullRequestVersionId),
+  ],
 );
 
 export const reviewUsage = pgTable("review_usage", {

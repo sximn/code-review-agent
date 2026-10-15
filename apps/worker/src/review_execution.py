@@ -162,6 +162,7 @@ class ReviewSession:
                         env=git_environment,
                         label=label,
                     )
+
                 await _require_command(
                     sandbox_client,
                     sandbox_id,
@@ -175,6 +176,7 @@ class ReviewSession:
                     "/workspace",
                     label="Checked-out repository size check",
                 )
+
                 try:
                     repo_size = int(str(checkout_size.get("stdout", "")).split()[0])
                 except (IndexError, ValueError) as exc:
@@ -220,21 +222,31 @@ class ReviewSession:
         except Exception as exc:
             failure = (str(exc) or type(exc).__name__)[:2000]
             logger.exception("Review %s failed", job_id)
+
         if usage_accumulator is not None:
             usage = usage_accumulator.materialize()
             cost = estimate_review_cost(
                 usage, run_completed=(failure is None and result is not None)
             )
+
         usage_payload = usage.model_dump(mode="json") if usage is not None else None
         cost_payload = cost.model_dump(mode="json") if cost is not None else None
         if failure is not None:
             return ReviewCompletion(
-                status="failed", error=failure, usage=usage_payload, cost=cost_payload
+                status="failed",
+                reviewed_head_sha=payload.head_sha,
+                error=failure,
+                usage=usage_payload,
+                cost=cost_payload,
             )
         if result is None:
             raise RuntimeError("Review completed without a result.")
         return ReviewCompletion(
-            status="finished", result=result, usage=usage_payload, cost=cost_payload
+            status="finished",
+            reviewed_head_sha=payload.head_sha,
+            result=result,
+            usage=usage_payload,
+            cost=cost_payload,
         )
 
     async def cleanup(self) -> None:

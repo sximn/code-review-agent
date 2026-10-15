@@ -79,6 +79,8 @@ describe("repositoryReviewSchema", () => {
       id: reviewId,
       repositoryId: "223e4567-e89b-42d3-a456-426614174000",
       pullRequestNumber: 17,
+      pullRequestVersionId: "323e4567-e89b-42d3-a456-426614174000",
+      headSha: "a".repeat(40),
       status: "finished",
       result,
       error: null,

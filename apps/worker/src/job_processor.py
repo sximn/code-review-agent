@@ -3,7 +3,7 @@ import logging
 
 from pydantic import ValidationError
 
-from .completion import ReviewCompletion
+from .completion import ReviewCompletion, StoredReviewCompletion
 from .completion_store import CompletionStore
 from .config import AppConfig
 from .processing_types import (
@@ -61,7 +61,7 @@ class JobProcessor:
         *,
         phase: str,
         reason: str,
-        completion: ReviewCompletion | None = None,
+        completion: StoredReviewCompletion | None = None,
         raw_completion: str | None = None,
     ) -> ProcessingOutcome:
         await self.store.dead_letter(
@@ -120,11 +120,13 @@ class JobProcessor:
                 phase="validation",
                 reason="Job payload must be a JSON object.",
             )
+
         try:
             payload = ReviewRequestPayload.model_validate(raw_payload)
         except ValidationError:
             completion = ReviewCompletion(
-                status="failed", error="The queued review payload is invalid."
+                status="failed",
+                error="The queued review payload is invalid.",
             )
             await self.store.save(job_id, completion)
         else:
@@ -136,16 +138,19 @@ class JobProcessor:
                 )
             except TransientReviewStateError:
                 return ProcessingOutcome.RETRY_PENDING
+
             if current_status in {"failed", "finished"}:
                 await self.store.acknowledge(message, job_id=job_id)
                 return ProcessingOutcome.ACKNOWLEDGED
+
             async with self.executor.open(job_id) as session:
                 completion = await session.run(payload)
                 await self.store.save(job_id, completion)
+
         return await self._deliver_completion(message, job_id, completion)
 
     async def _deliver_completion(
-        self, message: QueueMessage, job_id: str, completion: ReviewCompletion
+        self, message: QueueMessage, job_id: str, completion: StoredReviewCompletion
     ) -> ProcessingOutcome:
         try:
             await self.state_client.set_state(

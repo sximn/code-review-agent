@@ -5,6 +5,8 @@ from typing import Any, Literal
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .completion import CommitSha
+
 RepoVisibility = Literal["public", "private"]
 
 
@@ -38,6 +40,7 @@ class ReviewRequestPayload(BaseModel):
     repository_name: str
     pull_request_number: int = Field(ge=1, validation_alias="pull_request")
     visibility: RepoVisibility = Field()
+    head_sha: CommitSha
 
     @model_validator(mode="before")
     @classmethod
@@ -182,7 +185,6 @@ async def _fetch_ensure_repo(
             ),
         )
     else:
-        # Use your existing GitHub error translation here if needed.
         repo_response.raise_for_status()
 
     repo_data = repo_response.json()
@@ -217,15 +219,21 @@ async def fetch_pr_metadata(
         ),
     )
 
+    metadata = metadata_response.json()
+
+    base_sha = metadata["base"]["sha"]
+    # fetch scheduled SHA, not actual head SHA
+    # (there might have been new commits pushed, but worker respects web-payload's SHA)
+    head_sha = payload.head_sha
+
     diff_response = await _github_get(
         github_client,
-        pr_url,
+        f"{repo_url}/compare/{base_sha}...{head_sha}",
         visibility=visibility,
         token=token,
         accept="application/vnd.github.v3.diff",
         not_found_message=f"Pull request #{payload.pull_request_number} does not exist.",
     )
-    metadata = metadata_response.json()
 
     try:
         return PullRequestMetadata(
@@ -235,8 +243,8 @@ async def fetch_pr_metadata(
             title=metadata["title"],
             description=metadata["body"] or "",
             diff=diff_response.text,
-            base_sha=metadata["base"]["sha"],
-            head_sha=metadata["head"]["sha"],
+            base_sha=base_sha,
+            head_sha=head_sha,
         )
     except (TypeError, KeyError) as error:
         raise GitHubError("GitHub returned unexpected PR metadata.") from error

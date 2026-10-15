@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 import { ThemeProvider } from "next-themes";
 import { Providers } from "@/components/providers";
-import { Header } from "@/components/header";
 import { isDev, isProd } from "@/lib/env/env-flags";
 import { EnvironmentProvider } from "@/components/providers/environment-provider";
 
@@ -58,7 +57,7 @@ export default function RootLayout({
             }}
           >
             <Providers>
-              <Header />
+              {/* <Header /> */}
               {children}
             </Providers>
           </EnvironmentProvider>

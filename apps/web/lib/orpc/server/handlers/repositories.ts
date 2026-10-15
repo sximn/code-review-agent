@@ -7,6 +7,8 @@ import { and, eq } from "drizzle-orm";
 import { findConnectedRepository } from "@/lib/dashboard";
 import { repositoryContract } from "../../contract/repositories";
 
+import { recordPullRequestVersion } from "@/lib/pull-requests";
+
 const authed = appImplementer.use(requireSession);
 
 const checkRepository = authed.repositories.check.handler(
@@ -113,6 +115,17 @@ const listPullRequests = authed.repositories.pullRequests.handler(
             "We couldn't fetch open pull requests. Private repositories aren't supported yet.",
         });
       }
+
+      await db.transaction(async (tx) => {
+        for (const pr of result.pullRequests) {
+          await recordPullRequestVersion(
+            tx,
+            connectedRepository.id,
+            pr.number,
+            pr.headSha,
+          );
+        }
+      });
 
       return {
         pullRequests: result.pullRequests,

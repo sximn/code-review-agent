@@ -1,11 +1,15 @@
 "use client";
 
+import { cn } from "cn";
 import { type ComponentPropsWithRef } from "react";
 
-export function Logo(props: ComponentPropsWithRef<"svg">) {
+export function Logo({ className, ...props }: ComponentPropsWithRef<"svg">) {
   return (
     <svg
-      className="size-10 fill-black stroke-black dark:fill-neutral-300 dark:stroke-neutral-300"
+      className={cn(
+        "size-10 fill-black stroke-black dark:fill-neutral-300 dark:stroke-neutral-300",
+        className,
+      )}
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 75 500 350"
       {...props}

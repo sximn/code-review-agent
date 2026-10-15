@@ -10,3 +10,8 @@ export const db = drizzle({
   client,
   relations,
 });
+
+export type DatabaseType = typeof db;
+export type TransactionType = Parameters<
+  Parameters<DatabaseType["transaction"]>[0]
+>[0];
