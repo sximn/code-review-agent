@@ -59,6 +59,10 @@ const createReview = authed.reviews.create.handler(
         throw new Error("Pull request not found");
       }
 
+      if (pr.headSha !== input.headSha) {
+        throw new Error("Pull request head changed. Refresh and retry");
+      }
+
       createdReview = await db.transaction(async (tx) => {
         const version = await recordPullRequestVersion(
           tx,
