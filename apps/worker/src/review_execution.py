@@ -234,7 +234,7 @@ class ReviewSession:
         if failure is not None:
             return ReviewCompletion(
                 status="failed",
-                reviewed_head_sha=metadata.head_sha,
+                reviewed_head_sha=payload.head_sha,
                 error=failure,
                 usage=usage_payload,
                 cost=cost_payload,
@@ -243,7 +243,7 @@ class ReviewSession:
             raise RuntimeError("Review completed without a result.")
         return ReviewCompletion(
             status="finished",
-            reviewed_head_sha=metadata.head_sha,
+            reviewed_head_sha=payload.head_sha,
             result=result,
             usage=usage_payload,
             cost=cost_payload,
