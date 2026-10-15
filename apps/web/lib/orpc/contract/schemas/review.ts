@@ -94,7 +94,7 @@ export const reviewStateSchema = z.discriminatedUnion("status", [
       result: reviewResultSchema,
       usage: reviewUsageSchema.optional(),
       cost: reviewCostSchema.optional(),
-      reviewed_head_sha: commitShaSchema.nullable(),
+      reviewed_head_sha: commitShaSchema.optional(),
       completed_at: z.iso.datetime({ offset: true }).optional(),
     })
     .strict(),
