@@ -48,6 +48,7 @@ class TestJobProcessor:
                         "repository": "owner/repo",
                         "pull_request": 2,
                         "visibility": "public",
+                        "head_sha": "a" * 40,
                     }
                 ),
             },
@@ -55,7 +56,9 @@ class TestJobProcessor:
 
     @pytest.fixture
     def completion(self):
-        return ReviewCompletion(status="finished", result={"summary": "OK"})
+        return ReviewCompletion(
+            status="finished", reviewed_head_sha="a" * 40, result={"summary": "OK"}
+        )
 
     @pytest.fixture
     def store(self, completion):

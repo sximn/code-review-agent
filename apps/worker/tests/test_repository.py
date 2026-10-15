@@ -19,6 +19,7 @@ parse_handle_testdata = [
             "repository": "sximn/code-review-agent",
             "pull_request": 2,
             "visibility": "public",
+            "head_sha": "a" * 40,
         },
         {
             "repository_handle": "sximn/code-review-agent",
@@ -26,6 +27,7 @@ parse_handle_testdata = [
             "repository_owner": "sximn",
             "repository_name": "code-review-agent",
             "visibility": "public",
+            "head_sha": "a" * 40,
         },
     ),
     (
@@ -33,6 +35,7 @@ parse_handle_testdata = [
             "repository": "random/name.with-dots",
             "pull_request": 42,
             "visibility": "public",
+            "head_sha": "a" * 40,
         },
         {
             "repository_handle": "random/name.with-dots",
@@ -40,6 +43,7 @@ parse_handle_testdata = [
             "repository_owner": "random",
             "repository_name": "name.with-dots",
             "visibility": "public",
+            "head_sha": "a" * 40,
         },
     ),
 ]
@@ -154,24 +158,21 @@ async def test_fetch_pr_metadata():
             return httpx.Response(status_code=200, json={"private": False})
 
         if request.url.path == f"/repos/{REPO}/pulls/{PR}":
-            accept = request.headers["Accept"]
+            return httpx.Response(
+                status_code=200,
+                json={
+                    "title": "Cool change",
+                    "body": None,
+                    "base": {"sha": "b" * 40},
+                    "head": {"sha": "a" * 40},
+                },
+            )
 
-            if accept == "application/vnd.github+json":
-                return httpx.Response(
-                    status_code=200,
-                    json={
-                        "title": "Cool change",
-                        "body": None,
-                        "base": {"sha": "base123"},
-                        "head": {"sha": "head456"},
-                    },
-                )
-
-            if accept == "application/vnd.github.v3.diff":
-                return httpx.Response(
-                    200,
-                    text="diff --git a/README.md b/README.md",
-                )
+        if request.url.path == f"/repos/{REPO}/compare/{'b' * 40}...{'a' * 40}":
+            return httpx.Response(
+                200,
+                text="diff --git a/README.md b/README.md",
+            )
 
         raise AssertionError(
             f"Unexpected request: {request.method} {request.url} | path: {request.url.path}"
@@ -183,7 +184,12 @@ async def test_fetch_pr_metadata():
         result = await fetch_pr_metadata(
             client,
             payload=ReviewRequestPayload.model_validate(
-                {"repository": REPO, "pull_request": PR, "visibility": "public"}
+                {
+                    "repository": REPO,
+                    "pull_request": PR,
+                    "visibility": "public",
+                    "head_sha": "a" * 40,
+                }
             ),
         )
 
@@ -194,8 +200,8 @@ async def test_fetch_pr_metadata():
         title="Cool change",
         description="",
         diff="diff --git a/README.md b/README.md",
-        base_sha="base123",
-        head_sha="head456",
+        base_sha="b" * 40,
+        head_sha="a" * 40,
     )
 
     assert len(requests_called) == 3

@@ -41,6 +41,7 @@ class TestCompletionStoreRedis:
     def completion(self):
         return ReviewCompletion(
             status="finished",
+            reviewed_head_sha="a" * 40,
             result={"summary": "OK"},
         )
 
