@@ -17,7 +17,7 @@ export async function recordPullRequestVersion(
     })
     .onConflictDoUpdate({
       target: [pullRequest.repositoryId, pullRequest.number],
-      set: { number },
+      set: { number }, // no-op update, used just to get existing value in the returning() clause
     })
     .returning();
 
@@ -30,7 +30,7 @@ export async function recordPullRequestVersion(
     })
     .onConflictDoUpdate({
       target: [pullRequestVersion.pullRequestId, pullRequestVersion.headSha],
-      set: { headSha },
+      set: { headSha }, // no-op update, used just to get existing value in the returning() clause
     })
     .returning();
 
