@@ -194,6 +194,10 @@
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991
           },
+          "headSha": {
+            "type": "string",
+            "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+          },
           "url": {
             "type": "string",
             "format": "uri"
@@ -212,6 +216,7 @@
         },
         "required": [
           "number",
+          "headSha",
           "url",
           "title",
           "description",
@@ -236,6 +241,22 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "pullRequestVersionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "headSha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "status": {
             "type": "string",
@@ -311,6 +332,8 @@
           "id",
           "repositoryId",
           "pullRequestNumber",
+          "pullRequestVersionId",
+          "headSha",
           "status",
           "result",
           "error",
@@ -518,6 +541,22 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
+          "pullRequestVersionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "headSha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -582,6 +621,8 @@
           "id",
           "repositoryId",
           "pullRequestNumber",
+          "pullRequestVersionId",
+          "headSha",
           "status",
           "result",
           "error",

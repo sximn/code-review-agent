@@ -446,7 +446,8 @@ export function RepositoryRow({
                       // we assume that the API return newest review first
                       const latestReview = reviews.find(
                         (review) =>
-                          review.pullRequestNumber === pullRequest.number,
+                          review.pullRequestNumber === pullRequest.number &&
+                          review.headSha === pullRequest.headSha,
                       );
 
                       const isStarting =

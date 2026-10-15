@@ -1,3 +1,4 @@
+import { GIT_OBJECT_ID_PATTERN } from "@/lib/repository-pull-request-utils";
 import { z } from "zod";
 
 const count = z.int().nonnegative();
@@ -127,6 +128,8 @@ export const repositoryReviewSchema = z
     id: z.uuid(),
     repositoryId: z.uuid(),
     pullRequestNumber: z.number().int(),
+    pullRequestVersionId: z.uuid(),
+    headSha: z.string().regex(new RegExp(GIT_OBJECT_ID_PATTERN)).nullable(),
     status: reviewStatusSchema,
     result: reviewResultSchema.nullable(),
     error: z.string().nullable(),

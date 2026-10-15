@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { isRepositoryName, normalizeRepository } from "@/lib/repository-name";
+import {
+  isRepositoryName,
+  normalizeRepository,
+} from "@/lib/repository-pull-request-utils";
 
 describe("normalizeRepository", () => {
   it.each([

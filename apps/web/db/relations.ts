@@ -27,13 +27,27 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.repository.userId,
       to: r.user.id,
     }),
-    reviews: r.many.review(),
+    pullRequests: r.many.pullRequest(),
   },
 
-  review: {
+  pullRequest: {
     repository: r.one.repository({
-      from: r.review.repositoryId,
+      from: r.pullRequest.repositoryId,
       to: r.repository.id,
+    }),
+    versions: r.many.pullRequestVersion(),
+  },
+  pullRequestVersion: {
+    pullRequest: r.one.pullRequest({
+      from: r.pullRequestVersion.pullRequestId,
+      to: r.pullRequest.id,
+    }),
+    reviews: r.many.review(),
+  },
+  review: {
+    pullRequestVersion: r.one.pullRequestVersion({
+      from: r.review.pullRequestVersionId,
+      to: r.pullRequestVersion.id,
     }),
   },
 }));

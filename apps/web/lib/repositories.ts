@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GIT_OBJECT_ID_PATTERN } from "./repository-pull-request-utils";
 
 export type PublicRepository = {
   fullName: string;
@@ -11,6 +12,9 @@ const pullRequestSchema = z
     title: z.string(),
     body: z.string().nullable(),
     updated_at: z.iso.datetime(),
+    head: z.object({
+      sha: z.string().regex(new RegExp(GIT_OBJECT_ID_PATTERN)),
+    }),
   })
   .transform((pr) => ({
     number: pr.number,
@@ -18,6 +22,7 @@ const pullRequestSchema = z
     title: pr.title,
     description: pr.body ?? "",
     updatedAt: new Date(pr.updated_at),
+    headSha: pr.head.sha,
   }));
 
 const pullRequestsSchema = z.array(pullRequestSchema);
@@ -125,4 +130,34 @@ export async function getOpenPullRequests(
     pullRequests: pullRequestsSchema.parse(data),
     hasNextPage: response.headers.get("link")?.includes('rel="next"') ?? false,
   };
+}
+
+// resolve the head on the server at scheduling time, rather than trusting the UI
+export async function getPullRequest(
+  repository: string,
+  number: number,
+): Promise<PullRequest | null> {
+  const [owner, name] = repository.split("/");
+
+  const response = await fetch(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/pulls/${number}`,
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        "User-Agent": "REWY",
+        "X-GitHub-Api-Version": "2026-03-10",
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`GitHub returned ${response.status}`);
+  }
+
+  return pullRequestSchema.parse(await response.json());
 }

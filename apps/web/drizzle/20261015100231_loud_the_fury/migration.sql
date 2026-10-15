@@ -1,0 +1,1 @@
+ALTER TABLE "pull_request_version" DROP CONSTRAINT "pull_request_version_head_sha_valid", ADD CONSTRAINT "pull_request_version_head_sha_valid" CHECK ("head_sha" is null or "head_sha" ~ '^([0-9a-f]{40}|[0-9a-f]{64})$');

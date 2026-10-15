@@ -6,7 +6,10 @@ import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 
 import { client } from "@/lib/orpc/client";
-import { isRepositoryName, normalizeRepository } from "@/lib/repository-name";
+import {
+  isRepositoryName,
+  normalizeRepository,
+} from "@/lib/repository-pull-request-utils";
 
 import { AccessStep } from "./access-step";
 import { ConfigurationStep } from "./configuration-step";

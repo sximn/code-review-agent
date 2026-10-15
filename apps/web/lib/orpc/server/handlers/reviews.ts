@@ -5,6 +5,8 @@ import {
   findConnectedRepository,
   getRepositoryReviewsById,
 } from "@/lib/dashboard";
+import { getPullRequest } from "@/lib/repositories";
+import { recordPullRequestVersion } from "@/lib/pull-requests";
 import { review } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -45,17 +47,41 @@ const createReview = authed.reviews.create.handler(
     }
 
     const reviewId = randomUUID();
-    let createdReview: typeof review.$inferSelect;
+    let createdReview;
+
     try {
-      [createdReview] = await db
-        .insert(review)
-        .values({
-          id: reviewId,
+      const pr = await getPullRequest(
+        connectedRepository.fullName,
+        input.pullRequestNumber,
+      );
+
+      if (!pr) {
+        throw new Error("Pull request not found");
+      }
+
+      createdReview = await db.transaction(async (tx) => {
+        const version = await recordPullRequestVersion(
+          tx,
+          connectedRepository.id,
+          pr.number,
+          pr.headSha,
+        );
+        const [created] = await tx
+          .insert(review)
+          .values({
+            id: reviewId,
+            pullRequestVersionId: version.id,
+            status: "scheduled",
+          })
+          .returning();
+
+        return {
+          ...created,
           repositoryId: connectedRepository.id,
-          pullRequestNumber: input.pullRequestNumber,
-          status: "scheduled",
-        })
-        .returning();
+          pullRequestNumber: pr.number,
+          headSha: version.headSha,
+        };
+      });
     } catch (error) {
       console.error("Could not create review", error);
       throw errors.REVIEW_CREATE_FAILED();

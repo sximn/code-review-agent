@@ -1,3 +1,4 @@
+import { GIT_OBJECT_ID_PATTERN } from "@/lib/repository-pull-request-utils";
 import { z } from "zod";
 
 export const repositoryNameSchema = z
@@ -23,6 +24,7 @@ export const connectedRepositorySchema = z
 export const pullRequestSchema = z
   .object({
     number: z.int().positive(),
+    headSha: z.string().regex(new RegExp(GIT_OBJECT_ID_PATTERN)),
     url: z.url(),
     title: z.string(),
     description: z.string(),

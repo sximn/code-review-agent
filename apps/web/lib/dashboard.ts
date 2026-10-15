@@ -1,7 +1,13 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/drizzle";
-import { repository, review, reviewUsage } from "@/db/schema";
+import {
+  repository,
+  review,
+  reviewUsage,
+  pullRequest,
+  pullRequestVersion,
+} from "@/db/schema";
 
 export type ConnectedRepository = {
   id: string;
@@ -36,7 +42,7 @@ export async function getDashboardOverview(
         id: repository.id,
         name: repository.fullName,
         reviewedPullRequests: sql<number>`
-          count(distinct ${review.pullRequestNumber})
+          count(distinct ${pullRequest.id})
           filter (where ${review.status} = 'finished')::int
         `,
         reviewInProgress: sql<boolean>`
@@ -47,7 +53,12 @@ export async function getDashboardOverview(
         `,
       })
       .from(repository)
-      .leftJoin(review, eq(review.repositoryId, repository.id))
+      .leftJoin(pullRequest, eq(pullRequest.repositoryId, repository.id))
+      .leftJoin(
+        pullRequestVersion,
+        eq(pullRequestVersion.pullRequestId, pullRequest.id),
+      )
+      .leftJoin(review, eq(review.pullRequestVersionId, pullRequestVersion.id))
       .where(eq(repository.userId, userId))
       .groupBy(repository.id)
       .orderBy(desc(repository.createdAt)),
@@ -94,7 +105,15 @@ export async function getDashboardOverview(
         `,
       })
       .from(review)
-      .innerJoin(repository, eq(review.repositoryId, repository.id))
+      .innerJoin(
+        pullRequestVersion,
+        eq(review.pullRequestVersionId, pullRequestVersion.id),
+      )
+      .innerJoin(
+        pullRequest,
+        eq(pullRequestVersion.pullRequestId, pullRequest.id),
+      )
+      .innerJoin(repository, eq(pullRequest.repositoryId, repository.id))
       .where(eq(repository.userId, userId)),
   ]);
 
@@ -119,8 +138,10 @@ export async function getRepositoryReviewsById(
   return db
     .select({
       id: review.id,
-      repositoryId: review.repositoryId,
-      pullRequestNumber: review.pullRequestNumber,
+      repositoryId: repository.id,
+      pullRequestNumber: pullRequest.number,
+      pullRequestVersionId: review.pullRequestVersionId,
+      headSha: pullRequestVersion.headSha,
       result: review.result,
       status: review.status,
       error: review.error,
@@ -133,7 +154,15 @@ export async function getRepositoryReviewsById(
       },
     })
     .from(review)
-    .innerJoin(repository, eq(review.repositoryId, repository.id))
+    .innerJoin(
+      pullRequestVersion,
+      eq(review.pullRequestVersionId, pullRequestVersion.id),
+    )
+    .innerJoin(
+      pullRequest,
+      eq(pullRequestVersion.pullRequestId, pullRequest.id),
+    )
+    .innerJoin(repository, eq(pullRequest.repositoryId, repository.id))
     .leftJoin(reviewUsage, eq(reviewUsage.reviewId, review.id))
     .where(and(eq(repository.userId, userId), eq(repository.id, repositoryId)))
     .orderBy(desc(review.createdAt))
