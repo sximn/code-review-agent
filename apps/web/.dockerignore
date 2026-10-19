@@ -3,8 +3,14 @@ node_modules
 .git
 .turbo
 .pnpm-store
+
 coverage
+
 *.log
+
+**/*.tsbuildinfo
+**/.DS_Store
+
 .env
 .env.*
 !.env.example
