@@ -4,15 +4,17 @@ RUN npm install -g pnpm@12.4.1
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN chown node:node /app
+
+COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+USER node
 RUN pnpm install --frozen-lockfile
 
 
 FROM deps AS dev
 
-COPY . .
-RUN chown -R node:node /app
-USER node
+COPY --chown=node:node . .
 
 CMD ["pnpm", "exec", "next", "dev", "--hostname", "0.0.0.0"]
 
